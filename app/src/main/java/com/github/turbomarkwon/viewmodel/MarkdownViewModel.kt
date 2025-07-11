@@ -9,6 +9,7 @@ import com.github.turbomarkwon.data.MarkdownParseResult
 import com.github.turbomarkwon.data.MarkdownRenderState
 import com.github.turbomarkwon.parser.MarkdownParser
 import com.github.turbomarkwon.renderer.MarkdownRenderer
+import com.github.turbomarkwon.util.RecyclerViewPerformanceMonitor
 import kotlinx.coroutines.launch
 
 /**
@@ -37,6 +38,23 @@ class MarkdownViewModel : ViewModel() {
     // 性能数据
     private var parseResult: MarkdownParseResult? = null
     private var startupTime: Long = 0
+    
+    // 帧率监控数据
+    private val _frameMetrics = MutableLiveData<FrameMetrics>()
+    val frameMetrics: LiveData<FrameMetrics> = _frameMetrics
+    
+    // 滚动状态
+    private val _isScrolling = MutableLiveData<Boolean>(false)
+    val isScrolling: LiveData<Boolean> = _isScrolling
+    
+    // 帧率监控数据类
+    data class FrameMetrics(
+        val currentFps: Float,
+        val averageFrameTime: Float,
+        val droppedFrames: Int,
+        val rating: RecyclerViewPerformanceMonitor.PerformanceRating,
+        val scrollVelocity: Float = 0f
+    )
     
     /**
      * 加载并解析Markdown内容
@@ -73,6 +91,32 @@ class MarkdownViewModel : ViewModel() {
      */
     fun setStartupTime(startupTime: Long) {
         this.startupTime = startupTime
+    }
+    
+    /**
+     * 更新帧率数据
+     */
+    fun updateFrameMetrics(
+        currentFps: Float,
+        averageFrameTime: Float,
+        droppedFrames: Int,
+        rating: RecyclerViewPerformanceMonitor.PerformanceRating,
+        scrollVelocity: Float = 0f
+    ) {
+        _frameMetrics.value = FrameMetrics(
+            currentFps,
+            averageFrameTime,
+            droppedFrames,
+            rating,
+            scrollVelocity
+        )
+    }
+    
+    /**
+     * 更新滚动状态
+     */
+    fun updateScrollingState(isScrolling: Boolean) {
+        _isScrolling.value = isScrolling
     }
     
     /**

@@ -14,6 +14,7 @@ import com.github.turbomarkwon.databinding.ActivityMainBinding
 import com.github.turbomarkwon.databinding.DialogPerformanceStatsBinding
 import com.github.turbomarkwon.viewmodel.MarkdownViewModel
 import com.github.turbomarkwon.util.AppLog
+import com.github.turbomarkwon.util.RecyclerViewPerformanceMonitor
 import com.google.android.material.snackbar.Snackbar
 import io.noties.markwon.Markwon
 
@@ -28,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MarkdownViewModel by viewModels()
     private var startupTime: Long = 0
     
+    // 帧率监控相关
+    private var recyclerViewPerformanceMonitor: RecyclerViewPerformanceMonitor? = null
+    private var isScrolling = false
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         startupTime = System.currentTimeMillis()
         super.onCreate(savedInstanceState)
@@ -39,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         setupViewModel()
         setupSwipeRefresh()
         setupFab()
+        setupRecyclerViewPerformanceMonitor()
         loadSampleMarkdown()
     }
     
@@ -122,6 +128,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        
+        // 观察帧率数据
+        viewModel.frameMetrics.observe(this) { metrics ->
+            updateFrameMetricsUI(metrics)
+        }
+        
+        // 观察滚动状态
+        viewModel.isScrolling.observe(this) { scrolling ->
+            updateScrollStatusUI(scrolling)
+        }
     }
     
     /**
@@ -139,6 +155,101 @@ class MainActivity : AppCompatActivity() {
     private fun setupFab() {
         binding.fabStats.setOnClickListener {
             showPerformanceDialog()
+        }
+    }
+    
+    /**
+     * 设置RecyclerView专用性能监控器
+     */
+    private fun setupRecyclerViewPerformanceMonitor() {
+        recyclerViewPerformanceMonitor = RecyclerViewPerformanceMonitor().apply {
+            setOnPerformanceUpdateListener(object : RecyclerViewPerformanceMonitor.OnPerformanceUpdateListener {
+                override fun onScrollPerformanceUpdate(
+                    fps: Float,
+                    averageFrameTime: Float,
+                    droppedFrames: Int,
+                    scrollVelocity: Float,
+                    rating: RecyclerViewPerformanceMonitor.PerformanceRating
+                ) {
+                    // 更新ViewModel中的帧率数据
+                    viewModel.updateFrameMetrics(
+                        fps,
+                        averageFrameTime,
+                        droppedFrames,
+                        rating,
+                        scrollVelocity
+                    )
+                }
+                
+                override fun onScrollStateChanged(isScrolling: Boolean) {
+                    // 更新滚动状态
+                    this@MainActivity.isScrolling = isScrolling
+                    viewModel.updateScrollingState(isScrolling)
+                }
+            })
+            startMonitoring(binding.recyclerView)
+        }
+        AppLog.d("RecyclerView performance monitor initialized")
+    }
+    
+
+    
+    /**
+     * 更新帧率UI显示
+     */
+    @SuppressLint("SetTextI18n")
+    private fun updateFrameMetricsUI(metrics: MarkdownViewModel.FrameMetrics) {
+        binding.apply {
+            tvCurrentFps.text = "FPS: ${metrics.currentFps.toInt()}"
+            tvFrameTime.text = "Frame: ${String.format("%.1f", metrics.averageFrameTime)}ms"
+            
+            // 更新滚动速度显示
+            if (metrics.scrollVelocity > 0) {
+                tvScrollVelocity.text = "速度: ${String.format("%.0f", metrics.scrollVelocity)}px/s"
+            }
+            
+            // 根据帧率和滚动状态设置颜色
+            val color = if (isScrolling) {
+                // 滚动时使用严格的评级标准
+                when (metrics.rating) {
+                    RecyclerViewPerformanceMonitor.PerformanceRating.EXCELLENT -> 
+                        android.graphics.Color.GREEN
+                    RecyclerViewPerformanceMonitor.PerformanceRating.GOOD -> 
+                        android.graphics.Color.BLUE
+                    RecyclerViewPerformanceMonitor.PerformanceRating.FAIR -> 
+                        android.graphics.Color.YELLOW
+                    RecyclerViewPerformanceMonitor.PerformanceRating.POOR -> 
+                        android.graphics.Color.RED
+                }
+            } else {
+                // 静止状态使用宽松的评级标准
+                when {
+                    metrics.currentFps >= 30f -> android.graphics.Color.GREEN
+                    metrics.currentFps >= 20f -> android.graphics.Color.BLUE
+                    else -> android.graphics.Color.YELLOW
+                }
+            }
+            tvCurrentFps.setTextColor(color)
+        }
+    }
+    
+    /**
+     * 更新滚动状态UI
+     */
+    private fun updateScrollStatusUI(scrolling: Boolean) {
+        binding.apply {
+            tvScrollStatus.text = if (scrolling) {
+                "滚动中"
+            } else {
+                "静止 (节能)"
+            }
+            
+            // 根据滚动状态显示/隐藏速度信息
+            tvScrollVelocity.visibility = if (scrolling) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
         }
     }
     
@@ -197,5 +308,8 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         // 清理资源
         com.github.turbomarkwon.renderer.MarkdownRenderer.clearCache()
+        
+        // 停止RecyclerView性能监控
+        recyclerViewPerformanceMonitor?.stopMonitoring(binding.recyclerView)
     }
 }
