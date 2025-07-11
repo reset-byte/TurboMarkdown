@@ -280,16 +280,31 @@ class MainActivity : AppCompatActivity() {
         
         // 填充数据
         dialogBinding.apply {
+            // 基础性能指标
             tvParseTime.text = "${stats["parse_time"]}ms"
-            tvTotalItems.text = "${stats["total_items"]}"
             tvStartupTime.text = "${stats["startup_time"]}ms"
             tvMemoryUsage.text = "${stats["memory_usage"]}MB"
-            tvCacheSize.text = "${stats["cache_size"]}"
             
+            // 轻量级缓存性能
+            tvCacheHitRate.text = "${stats["cache_hit_rate"]}%"
+            tvCacheHits.text = "${stats["cache_hits"]}"
+            tvCacheMisses.text = "${stats["cache_misses"]}"
+            tvLightweightCacheSize.text = "${stats["lightweight_cache_size"]} 项"
+            tvCacheMemoryEstimate.text = "${stats["cache_memory_estimate"]}"
+            
+            // 高级性能指标
+            tvAvgParseTime.text = "${stats["avg_parse_time"]}ms"
+            tvAvgRenderTime.text = "${stats["avg_render_time"]}ms"
+            tvMemoryEfficiency.text = "${stats["memory_efficiency"]}"
+            tvCacheEffectiveness.text = "${stats["cache_effectiveness"]}"
+            
+            // 内容统计
+            tvTotalItems.text = "${stats["total_items"]}"
             tvParagraphs.text = "${stats["paragraphs"]}"
             tvHeadings.text = "${stats["headings"]}"
             tvCodeBlocks.text = "${stats["code_blocks"]}"
             tvListItems.text = "${stats["lists"]}"
+            tvTables.text = "${stats["tables"]}"
         }
         
         val dialog = AlertDialog.Builder(this)
@@ -304,10 +319,23 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
     
+    override fun onLowMemory() {
+        super.onLowMemory()
+        // 智能缓存清理
+        com.github.turbomarkwon.cache.CachePerformanceAnalyzer.performSmartCacheCleanup()
+        // 清理语法高亮缓存以释放内存
+        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
         // 清理资源
         com.github.turbomarkwon.renderer.MarkdownRenderer.clearCache()
+        com.github.turbomarkwon.cache.LightweightMarkdownCache.clearAll()
+        com.github.turbomarkwon.cache.CachePerformanceAnalyzer.logPerformanceDetails()
+        
+        // 清理语法高亮缓存
+        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
         
         // 停止RecyclerView性能监控
         recyclerViewPerformanceMonitor?.stopMonitoring(binding.recyclerView)

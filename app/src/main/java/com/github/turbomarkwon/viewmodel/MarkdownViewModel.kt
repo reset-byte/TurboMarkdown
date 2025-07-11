@@ -4,6 +4,8 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.turbomarkwon.cache.LightweightMarkdownCache
+import com.github.turbomarkwon.cache.CachePerformanceAnalyzer
 import com.github.turbomarkwon.data.MarkdownItem
 import com.github.turbomarkwon.data.MarkdownParseResult
 import com.github.turbomarkwon.data.MarkdownRenderState
@@ -18,6 +20,7 @@ import kotlinx.coroutines.launch
 class MarkdownViewModel : ViewModel() {
     
     private val markdownParser = MarkdownParser()
+    // 不再使用重量级的解析缓存，改为使用轻量级策略
     
     // 渲染状态
     private val _renderState = MutableLiveData<MarkdownRenderState>()
@@ -65,8 +68,17 @@ class MarkdownViewModel : ViewModel() {
                 _isLoading.value = true
                 _renderState.value = MarkdownRenderState.Loading
                 
-                // 在后台线程解析Markdown
+                // 拍摄性能快照
+                CachePerformanceAnalyzer.takeMemorySnapshot()
+                
+                // 直接解析，不使用重量级缓存
+                // 缓存将在渲染层面（MarkdownRenderer）中进行
+                val startTime = System.currentTimeMillis()
                 val result = markdownParser.parseMarkdownAsync(markdownText)
+                val parseTime = System.currentTimeMillis() - startTime
+                
+                // 手动记录解析时间到性能分析器
+                CachePerformanceAnalyzer.recordParseTime(parseTime)
                 
                 // 保存解析结果用于统计
                 parseResult = result
@@ -125,8 +137,11 @@ class MarkdownViewModel : ViewModel() {
     fun refresh() {
         val currentItems = _markdownItems.value
         if (currentItems != null) {
-            // 清理缓存并重新加载
+            // 清理所有缓存并重新加载
             MarkdownRenderer.clearCache()
+            LightweightMarkdownCache.clearAll()
+            CachePerformanceAnalyzer.reset()
+            
             // 这里可以重新加载原始Markdown文本
             // 为了简化，我们只是重新设置当前项目
             _markdownItems.value = currentItems
@@ -139,6 +154,9 @@ class MarkdownViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         MarkdownRenderer.clearCache()
+        LightweightMarkdownCache.clearAll()
+        CachePerformanceAnalyzer.logPerformanceDetails()
+        CachePerformanceAnalyzer.reset()
     }
     
     /**
@@ -148,6 +166,8 @@ class MarkdownViewModel : ViewModel() {
         val items = _markdownItems.value ?: emptyList()
         val parseTime = parseResult?.parseTimeMs ?: 0L
         val memoryUsage = getMemoryUsage()
+        val lightweightCacheStats = LightweightMarkdownCache.getCacheStats()
+        val performanceReport = CachePerformanceAnalyzer.generateReport()
         
         return mapOf(
             "total_items" to items.size,
@@ -157,6 +177,15 @@ class MarkdownViewModel : ViewModel() {
             "lists" to items.count { it is MarkdownItem.ListItem },
             "tables" to items.count { it is MarkdownItem.Table },
             "cache_size" to MarkdownRenderer.getCacheSize(),
+            "lightweight_cache_size" to lightweightCacheStats.cacheSize,
+            "cache_hit_rate" to lightweightCacheStats.hitRate,
+            "cache_hits" to lightweightCacheStats.hitCount,
+            "cache_misses" to lightweightCacheStats.missCount,
+            "cache_memory_estimate" to "${lightweightCacheStats.memoryEstimate / 1024}KB",
+            "avg_parse_time" to performanceReport.avgParseTime,
+            "avg_render_time" to performanceReport.avgRenderTime,
+            "memory_efficiency" to "${String.format("%.1f", performanceReport.memoryEfficiency)}%",
+            "cache_effectiveness" to "${String.format("%.1f", performanceReport.cacheEffectiveness)}%",
             "parse_time" to parseTime,
             "startup_time" to startupTime,
             "memory_usage" to memoryUsage
