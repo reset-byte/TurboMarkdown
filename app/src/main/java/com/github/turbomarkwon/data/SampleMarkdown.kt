@@ -6,6 +6,326 @@ package com.github.turbomarkwon.data
 object SampleMarkdown {
     
     /**
+     * Mermaid图表专项测试数据
+     */
+    val MERMAID_TEST_MARKDOWN = """
+# Mermaid 图表测试套件
+
+本文档专门用于测试各种类型的Mermaid图表渲染效果。
+
+## 1. 流程图测试
+
+### 1.1 基本流程图
+```mermaid
+flowchart TD
+    A[开始] --> B{是否有数据?}
+    B -->|是| C[处理数据]
+    B -->|否| D[获取数据]
+    C --> E[渲染图表]
+    D --> C
+    E --> F[显示结果]
+    F --> G[结束]
+```
+
+### 1.2 复杂流程图
+```mermaid
+flowchart LR
+    A[用户请求] --> B[身份验证]
+    B -->|成功| C[权限检查]
+    B -->|失败| D[登录页面]
+    C -->|有权限| E[数据处理]
+    C -->|无权限| F[错误提示]
+    E --> G[缓存检查]
+    G -->|命中| H[返回缓存]
+    G -->|未命中| I[数据库查询]
+    I --> J[更新缓存]
+    J --> K[返回数据]
+    H --> L[格式化输出]
+    K --> L
+    L --> M[发送响应]
+```
+
+## 2. 序列图测试
+
+### 2.1 基本序列图
+```mermaid
+sequenceDiagram
+    participant User as 用户
+    participant App as 应用
+    participant Server as 服务器
+    participant DB as 数据库
+    
+    User->>App: 发起请求
+    App->>Server: 转发请求
+    Server->>DB: 查询数据
+    DB-->>Server: 返回数据
+    Server-->>App: 返回结果
+    App-->>User: 显示结果
+```
+
+### 2.2 复杂序列图
+```mermaid
+sequenceDiagram
+    participant Client as 客户端
+    participant Gateway as 网关
+    participant Auth as 认证服务
+    participant Cache as 缓存
+    participant Service as 业务服务
+    participant DB as 数据库
+    
+    Client->>Gateway: 请求数据
+    Gateway->>Auth: 验证token
+    Auth-->>Gateway: 验证通过
+    Gateway->>Cache: 检查缓存
+    Cache-->>Gateway: 缓存未命中
+    Gateway->>Service: 调用业务服务
+    Service->>DB: 查询数据
+    DB-->>Service: 返回数据
+    Service->>Cache: 更新缓存
+    Service-->>Gateway: 返回结果
+    Gateway-->>Client: 返回数据
+```
+
+## 3. 类图测试
+
+### 3.1 基本类图
+```mermaid
+classDiagram
+    class MarkdownRenderer {
+        +renderMarkdown(text: String)
+        +clearCache()
+        -parseNodes(nodes: List)
+    }
+    
+    class CodeDisplayView {
+        +setCode(code: String, language: String)
+        +copyToClipboard()
+        -highlightSyntax(code: String)
+    }
+    
+    class MermaidDisplayView {
+        +setMermaidContent(content: String)
+        +destroy()
+        -loadTemplate()
+        -renderChart()
+    }
+    
+    MarkdownRenderer --> CodeDisplayView : uses
+    MarkdownRenderer --> MermaidDisplayView : uses
+```
+
+### 3.2 复杂类图
+```mermaid
+classDiagram
+    class Application {
+        <<interface>>
+        +onCreate()
+        +onDestroy()
+    }
+    
+    class MainActivity {
+        -binding: ActivityMainBinding
+        -viewModel: MarkdownViewModel
+        -adapter: MarkdownAdapter
+        +onCreate()
+        +setupRecyclerView()
+        +showTestDialog()
+    }
+    
+    class MarkdownAdapter {
+        -markwon: Markwon
+        +onCreateViewHolder()
+        +onBindViewHolder()
+        +getItemViewType()
+    }
+    
+    class BaseViewHolder {
+        <<abstract>>
+        +bind(item: MarkdownItem)
+        +onRecycled()
+    }
+    
+    class CodeBlockViewHolder {
+        -codeDisplayView: CodeDisplayView
+        -mermaidDisplayView: MermaidDisplayView
+        +bind()
+        +showCodeBlock()
+        +showMermaidDiagram()
+    }
+    
+    Application <|-- MainActivity
+    MainActivity --> MarkdownAdapter
+    MarkdownAdapter --> BaseViewHolder
+    BaseViewHolder <|-- CodeBlockViewHolder
+    CodeBlockViewHolder --> CodeDisplayView
+    CodeBlockViewHolder --> MermaidDisplayView
+```
+
+## 4. 状态图测试
+
+### 4.1 基本状态图
+```mermaid
+stateDiagram-v2
+    [*] --> Loading
+    Loading --> Success
+    Loading --> Error
+    Success --> [*]
+    Error --> Loading : 重试
+    Error --> [*]
+```
+
+### 4.2 复杂状态图
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Loading : 开始渲染
+    Loading --> Parsing : 解析Markdown
+    Parsing --> Rendering : 渲染视图
+    Rendering --> Success : 成功
+    Parsing --> Error : 解析失败
+    Rendering --> Error : 渲染失败
+    Error --> Loading : 重试
+    Success --> Idle : 完成
+    Success --> Loading : 重新加载
+    
+    state Loading {
+        [*] --> Preparing
+        Preparing --> Processing
+        Processing --> Finalizing
+        Finalizing --> [*]
+    }
+    
+    state Error {
+        [*] --> NetworkError
+        [*] --> ParseError
+        [*] --> RenderError
+        NetworkError --> [*]
+        ParseError --> [*]
+        RenderError --> [*]
+    }
+```
+
+## 5. 甘特图测试
+
+### 5.1 项目进度甘特图
+```mermaid
+gantt
+    title TurboMarkdown开发进度
+    dateFormat  YYYY-MM-DD
+    section 需求分析
+    需求调研          :done, des1, 2024-01-01, 2024-01-07
+    架构设计          :done, des2, 2024-01-08, 2024-01-14
+    技术选型          :done, des3, 2024-01-15, 2024-01-21
+    section 开发阶段
+    基础框架          :done, dev1, 2024-01-22, 2024-02-05
+    Markdown解析      :done, dev2, 2024-02-06, 2024-02-20
+    UI渲染优化        :done, dev3, 2024-02-21, 2024-03-06
+    性能优化          :active, dev4, 2024-03-07, 2024-03-20
+    Mermaid支持       :active, dev5, 2024-03-15, 2024-03-25
+    section 测试阶段
+    单元测试          :test1, 2024-03-21, 2024-03-28
+    集成测试          :test2, 2024-03-29, 2024-04-05
+    性能测试          :test3, 2024-04-06, 2024-04-12
+    section 发布阶段
+    Beta版本          :beta, 2024-04-13, 2024-04-19
+    正式发布          :release, 2024-04-20, 2024-04-26
+```
+
+## 6. 饼图测试
+
+### 6.1 性能统计饼图
+```mermaid
+pie title 应用性能分布
+    "渲染时间" : 42.5
+    "解析时间" : 28.3
+    "缓存命中" : 15.2
+    "网络请求" : 8.7
+    "其他" : 5.3
+```
+
+## 7. 用户旅程图测试
+
+### 7.1 用户使用流程
+```mermaid
+journey
+    title 用户使用TurboMarkdown流程
+    section 初次使用
+      下载应用 : 5: 用户
+      打开应用 : 4: 用户
+      查看示例 : 3: 用户
+    section 日常使用
+      加载文档 : 4: 用户
+      浏览内容 : 5: 用户
+      查看图表 : 5: 用户
+      复制代码 : 4: 用户
+    section 高级功能
+      性能统计 : 3: 用户
+      测试用例 : 2: 用户
+      分享内容 : 4: 用户
+```
+
+## 8. Git图测试
+
+### 8.1 Git分支流程
+```mermaid
+gitGraph
+    commit id: "初始化项目"
+    branch feature/markdown-parser
+    checkout feature/markdown-parser
+    commit id: "添加Markdown解析器"
+    commit id: "优化解析性能"
+    checkout main
+    merge feature/markdown-parser
+    commit id: "发布v1.0"
+    branch feature/mermaid-support
+    checkout feature/mermaid-support
+    commit id: "添加Mermaid支持"
+    commit id: "优化图表渲染"
+    checkout main
+    merge feature/mermaid-support
+    commit id: "发布v1.1"
+```
+
+## 9. 思维导图测试
+
+### 9.1 应用架构思维导图
+```mermaid
+mindmap
+  root((TurboMarkdown))
+    UI层
+      MainActivity
+      MarkdownAdapter
+      ViewHolders
+    业务层
+      MarkdownViewModel
+      MarkdownParser
+      MarkdownRenderer
+    数据层
+      MarkdownItem
+      SampleMarkdown
+      Cache
+    视图层
+      CodeDisplayView
+      MermaidDisplayView
+      RecyclerView
+```
+
+---
+
+## 测试总结
+
+本测试套件包含了9种不同类型的Mermaid图表，用于验证：
+
+1. **渲染正确性** - 各种图表类型是否正确显示
+2. **性能表现** - 复杂图表的渲染速度
+3. **内存使用** - 多个图表的内存占用情况
+4. **错误处理** - 异常情况的处理能力
+5. **用户体验** - 图表的交互和显示效果
+
+通过这些测试用例，可以全面评估Mermaid图表渲染功能的质量和稳定性。
+"""
+
+    /**
      * 超长技术文档示例
      */
     val SAMPLE_LONG_MARKDOWN = """

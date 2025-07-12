@@ -15,6 +15,7 @@ import com.github.turbomarkwon.renderer.MarkdownRenderer
 import io.noties.markwon.Markwon
 import com.github.turbomarkwon.util.AppLog
 import com.github.turbomarkwon.views.CodeDisplayView
+import com.github.turbomarkwon.views.MermaidDisplayView
 import org.commonmark.node.FencedCodeBlock
 import org.commonmark.node.IndentedCodeBlock
 import android.view.View
@@ -301,20 +302,26 @@ class MarkdownAdapter(
     // 代码块ViewHolder - 处理独立的代码块
     class CodeBlockViewHolder(private val binding: ItemMarkdownCodeBlockBinding) : BaseViewHolder(binding.root) {
         private var codeDisplayView: CodeDisplayView? = null
+        private var mermaidDisplayView: MermaidDisplayView? = null
         private var currentCodeHash: String? = null
         
         override fun bind(item: MarkdownItem, markwon: Markwon) {
             if (item is MarkdownItem.CodeBlock) {
                 AppLog.d("Binding CodeBlock item id=${item.id}, language=${item.language}")
                 
-                // 使用CodeDisplayView显示代码块
-                showCodeBlock(item)
+                // 根据语言类型判断是否为mermaid图表
+                if (item.language?.lowercase() == "mermaid") {
+                    showMermaidDiagram(item)
+                } else {
+                    showCodeBlock(item)
+                }
             }
         }
         
         private fun showCodeBlock(codeBlockItem: MarkdownItem.CodeBlock) {
-            // 隐藏普通文本视图
+            // 隐藏普通文本视图和mermaid视图
             binding.textView.visibility = View.GONE
+            cleanupMermaidView()
             
             // 显示代码容器
             binding.codeContainer.visibility = View.VISIBLE
@@ -346,15 +353,69 @@ class MarkdownAdapter(
             }
         }
         
-        override fun onRecycled() {
-            super.onRecycled()
-            // 清理CodeDisplayView
+        private fun showMermaidDiagram(codeBlockItem: MarkdownItem.CodeBlock) {
+            // 隐藏普通文本视图和代码视图
+            binding.textView.visibility = View.GONE
+            cleanupCodeView()
+            
+            // 显示代码容器
+            binding.codeContainer.visibility = View.VISIBLE
+            
+            // 从节点中提取Mermaid图表内容
+            val mermaidContent = when (val node = codeBlockItem.node) {
+                is FencedCodeBlock -> node.literal ?: ""
+                is IndentedCodeBlock -> node.literal ?: ""
+                else -> ""
+            }
+            
+            // 生成内容哈希值用于检查是否需要更新
+            val contentHash = "${mermaidContent.hashCode()}_mermaid"
+            
+            // 创建或重用MermaidDisplayView
+            if (mermaidDisplayView == null) {
+                mermaidDisplayView = MermaidDisplayView(binding.root.context)
+                binding.codeContainer.addView(mermaidDisplayView)
+                AppLog.d("Created new MermaidDisplayView for mermaid diagram")
+            }
+            
+            // 只有当内容发生变化时才更新MermaidDisplayView
+            if (currentCodeHash != contentHash) {
+                mermaidDisplayView?.setMermaidContent(mermaidContent) { success, error ->
+                    if (success) {
+                        AppLog.d("Mermaid diagram rendered successfully")
+                    } else {
+                        AppLog.e("Mermaid diagram rendering failed: $error")
+                    }
+                }
+                currentCodeHash = contentHash
+                AppLog.d("Updated mermaid content: length=${mermaidContent.length}")
+            } else {
+                AppLog.d("Mermaid content unchanged, skipping update")
+            }
+        }
+        
+        private fun cleanupCodeView() {
             if (codeDisplayView != null) {
                 binding.codeContainer.removeView(codeDisplayView)
                 codeDisplayView = null
-                currentCodeHash = null
-                AppLog.d("Recycled CodeDisplayView from CodeBlockViewHolder")
             }
+        }
+        
+        private fun cleanupMermaidView() {
+            if (mermaidDisplayView != null) {
+                mermaidDisplayView?.destroy()
+                binding.codeContainer.removeView(mermaidDisplayView)
+                mermaidDisplayView = null
+            }
+        }
+        
+        override fun onRecycled() {
+            super.onRecycled()
+            // 清理CodeDisplayView和MermaidDisplayView
+            cleanupCodeView()
+            cleanupMermaidView()
+            currentCodeHash = null
+            AppLog.d("Recycled CodeBlockViewHolder")
         }
     }
 

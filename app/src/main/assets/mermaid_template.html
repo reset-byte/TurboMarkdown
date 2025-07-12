@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #ffffff;
+            overflow-x: auto;
+        }
+        
+        .mermaid-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .mermaid {
+            max-width: 100%;
+            background-color: transparent;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            padding: 20px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c2c7;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .loading-message {
+            color: #6c757d;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        /* 自定义Mermaid主题 */
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* 确保图表在移动设备上正确显示 */
+        @media (max-width: 768px) {
+            .mermaid-container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid-container">
+        <div class="loading-message">正在渲染图表...</div>
+        <div id="mermaid-diagram" class="mermaid" style="display: none;"></div>
+    </div>
+    
+    <script>
+        // 全局变量
+        let isMermaidReady = false;
+        let isPageReady = false;
+        let pendingDiagramText = null;
+        
+        // 检查Mermaid是否加载完成
+        function checkMermaidReady() {
+            if (typeof mermaid !== 'undefined' && mermaid.initialize) {
+                isMermaidReady = true;
+                
+                // 配置Mermaid
+                try {
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'default',
+                        themeVariables: {
+                            primaryColor: '#007bff',
+                            primaryTextColor: '#212529',
+                            primaryBorderColor: '#6c757d',
+                            lineColor: '#6c757d',
+                            secondaryColor: '#f8f9fa',
+                            tertiaryColor: '#e9ecef',
+                            background: '#ffffff',
+                            backgroundPatternColor: '#f8f9fa',
+                            clusterBkg: '#f8f9fa',
+                            clusterBorder: '#6c757d',
+                            altBackground: '#f8f9fa'
+                        },
+                        securityLevel: 'loose',
+                        htmlLabels: true,
+                        // 启用所有图表类型
+                        deterministicIds: true,
+                        flowchart: {
+                            useMaxWidth: true,
+                            htmlLabels: true,
+                            curve: 'basis'
+                        },
+                        sequence: {
+                            diagramMarginX: 50,
+                            diagramMarginY: 10,
+                            actorMargin: 50,
+                            width: 150,
+                            height: 65,
+                            boxMargin: 10,
+                            boxTextMargin: 5,
+                            noteMargin: 10,
+                            messageMargin: 35,
+                            mirrorActors: true,
+                            bottomMarginAdj: 1,
+                            useMaxWidth: true,
+                            rightAngles: false,
+                            showSequenceNumbers: false
+                        },
+                        gantt: {
+                            titleTopMargin: 25,
+                            barHeight: 20,
+                            fontFamily: '"Open Sans", sans-serif',
+                            fontSize: 11,
+                            fontWeight: 'normal',
+                            gridLineStartPadding: 35,
+                            leftPadding: 75,
+                            sidePadding: 75,
+                            topPadding: 50,
+                            topAxis: false
+                        },
+                        gitGraph: {
+                            theme: 'base',
+                            themeVariables: {
+                                primaryColor: '#007bff',
+                                primaryTextColor: '#212529',
+                                primaryBorderColor: '#6c757d',
+                                lineColor: '#6c757d',
+                                secondaryColor: '#f8f9fa',
+                                tertiaryColor: '#e9ecef'
+                            },
+                            mainBranchName: 'main',
+                            showBranches: true,
+                            showCommitLabel: true,
+                            rotateCommitLabel: true
+                        },
+                        pie: {
+                            useMaxWidth: true,
+                            textPosition: 0.75
+                        },
+                        journey: {
+                            diagramMarginX: 50,
+                            diagramMarginY: 10,
+                            leftMargin: 150,
+                            width: 150,
+                            height: 50,
+                            boxMargin: 10,
+                            boxTextMargin: 5,
+                            noteMargin: 10,
+                            messageMargin: 35,
+                            bottomMarginAdj: 1,
+                            useMaxWidth: true,
+                            rightAngles: false
+                        },
+                        state: {
+                            dividerMargin: 10,
+                            sizeUnit: 5,
+                            padding: 8,
+                            textHeight: 10,
+                            titleShift: -15,
+                            noteMargin: 10,
+                            forkWidth: 70,
+                            forkHeight: 7,
+                            miniPadding: 2,
+                            fontSizeFactor: 5.02,
+                            fontSize: 24,
+                            labelHeight: 16,
+                            edgeLengthFactor: '20',
+                            compositTitleSize: 35,
+                            radius: 5
+                        },
+                        class: {
+                            useMaxWidth: true,
+                            defaultRenderer: 'dagre-wrapper'
+                        },
+                        mindmap: {
+                            useMaxWidth: true,
+                            padding: 10,
+                            maxNodeWidth: 200
+                        }
+                    });
+                    
+                    console.log('Mermaid初始化成功');
+                } catch (error) {
+                    console.error('Mermaid初始化失败:', error);
+                }
+                
+                // 通知页面准备就绪
+                notifyPageReady();
+                
+                // 如果有待渲染的图表，立即渲染
+                if (pendingDiagramText) {
+                    renderMermaidDiagram(pendingDiagramText);
+                    pendingDiagramText = null;
+                }
+            } else {
+                // 如果Mermaid还没有加载完成，延迟重试
+                setTimeout(checkMermaidReady, 100);
+            }
+        }
+        
+        // 通知Android页面准备就绪
+        function notifyPageReady() {
+            if (isPageReady && isMermaidReady) {
+                console.log('页面和Mermaid都已就绪');
+                if (window.MermaidInterface) {
+                    window.MermaidInterface.onPageReady();
+                }
+            }
+        }
+
+        // 渲染图表的函数
+        function renderMermaidDiagram(diagramText) {
+            try {
+                // 检查是否准备就绪
+                if (!isMermaidReady) {
+                    console.log('Mermaid还未就绪，缓存图表文本');
+                    pendingDiagramText = diagramText;
+                    return;
+                }
+                
+                // 验证diagram文本
+                if (!diagramText || diagramText.trim() === '') {
+                    throw new Error('图表内容不能为空');
+                }
+                
+                // 隐藏加载消息
+                const loadingElement = document.querySelector('.loading-message');
+                if (loadingElement) {
+                    loadingElement.style.display = 'none';
+                }
+                
+                // 清理之前的内容
+                const diagramElement = document.getElementById('mermaid-diagram');
+                if (diagramElement) {
+                    diagramElement.innerHTML = '';
+                }
+                
+                console.log('开始渲染Mermaid图表');
+                
+                // 使用Mermaid渲染图表
+                mermaid.render('mermaid-svg', diagramText).then((result) => {
+                    if (result && result.svg) {
+                        diagramElement.innerHTML = result.svg;
+                        diagramElement.style.display = 'block';
+                        
+                        console.log('Mermaid图表渲染成功');
+                        
+                        // 调用Android接口通知渲染完成
+                        if (window.MermaidInterface) {
+                            window.MermaidInterface.onRenderComplete();
+                        }
+                    } else {
+                        throw new Error('渲染结果为空');
+                    }
+                }).catch((error) => {
+                    console.error('Mermaid渲染失败:', error);
+                    showError('渲染失败: ' + error.message);
+                });
+                
+            } catch (error) {
+                console.error('Mermaid渲染错误:', error);
+                showError('渲染失败: ' + error.message);
+            }
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            const loadingElement = document.querySelector('.loading-message');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            
+            const diagramElement = document.getElementById('mermaid-diagram');
+            if (diagramElement) {
+                diagramElement.style.display = 'none';
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            const container = document.querySelector('.mermaid-container');
+            if (container) {
+                // 移除之前的错误消息
+                const oldErrors = container.querySelectorAll('.error-message');
+                oldErrors.forEach(el => el.remove());
+                
+                container.appendChild(errorDiv);
+            }
+            
+            // 调用Android接口通知渲染失败
+            if (window.MermaidInterface) {
+                window.MermaidInterface.onRenderError(message);
+            }
+        }
+
+        // 处理Android调用的接口
+        window.renderMermaid = function(diagramText) {
+            renderMermaidDiagram(diagramText);
+        };
+        
+        // 处理Base64编码的Mermaid内容
+        window.renderMermaidFromBase64 = function(base64Content) {
+            try {
+                // 正确的UTF-8 Base64解码
+                const decodedContent = decodeBase64UTF8(base64Content);
+                console.log('解码Base64内容，长度:', decodedContent.length);
+                console.log('解码内容预览:', decodedContent.substring(0, 100));
+                renderMermaidDiagram(decodedContent);
+            } catch (error) {
+                console.error('Base64解码失败:', error);
+                showError('Base64解码失败: ' + error.message);
+            }
+        };
+        
+        // UTF-8 Base64解码函数
+        function decodeBase64UTF8(base64String) {
+            try {
+                // 先使用atob解码Base64为二进制字符串
+                const binaryString = atob(base64String);
+                
+                // 然后使用TextDecoder正确解码UTF-8
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const decoder = new TextDecoder('utf-8');
+                return decoder.decode(bytes);
+            } catch (error) {
+                console.error('UTF-8解码失败:', error);
+                // 备用方案：使用decodeURIComponent + escape的组合
+                try {
+                    return decodeURIComponent(escape(atob(base64String)));
+                } catch (fallbackError) {
+                    console.error('备用解码方案也失败:', fallbackError);
+                    throw new Error('UTF-8解码失败: ' + error.message);
+                }
+            }
+        }
+
+        // 页面加载完成后的处理
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM内容已加载完成');
+            isPageReady = true;
+            
+            // 开始检查Mermaid是否就绪
+            checkMermaidReady();
+        });
+        
+        // 确保在window.onload事件后也进行检查
+        window.addEventListener('load', function() {
+            console.log('页面完全加载完成');
+            isPageReady = true;
+            
+            // 延迟检查Mermaid状态
+            setTimeout(checkMermaidReady, 100);
+        });
+    </script>
+</body>
+</html> 
