@@ -24,6 +24,7 @@ import android.util.Base64
  * - 响应式设计，适配不同屏幕尺寸
  * - 错误处理和加载状态显示
  * - 与Android原生代码的JavaScript接口
+ * - 状态管理，避免重复渲染相同内容
  */
 class MermaidDisplayView @JvmOverloads constructor(
     context: Context,
@@ -36,8 +37,19 @@ class MermaidDisplayView @JvmOverloads constructor(
     private lateinit var errorTextView: TextView
     
     private var mermaidContent: String = ""
+    private var lastRenderedContent: String = ""
     private var isPageReady: Boolean = false
     private var renderCallback: ((Boolean, String?) -> Unit)? = null
+    
+    // 渲染状态枚举
+    enum class RenderState {
+        NONE,       // 未开始渲染
+        LOADING,    // 正在加载
+        SUCCESS,    // 渲染成功
+        ERROR       // 渲染失败
+    }
+    
+    private var currentRenderState: RenderState = RenderState.NONE
     
     companion object {
         private const val MERMAID_TEMPLATE_FILE = "file:///android_asset/mermaid_template.html"
@@ -156,16 +168,29 @@ class MermaidDisplayView @JvmOverloads constructor(
      * @param callback 渲染完成后的回调 (成功/失败, 错误信息)
      */
     fun setMermaidContent(content: String, callback: ((Boolean, String?) -> Unit)? = null) {
-        this.mermaidContent = content.trim()
+        val trimmedContent = content.trim()
         this.renderCallback = callback
         
-        if (mermaidContent.isEmpty()) {
+        if (trimmedContent.isEmpty()) {
             showError("Mermaid内容不能为空")
             callback?.invoke(false, "内容为空")
             return
         }
         
+        // 检查是否为相同内容且已经渲染成功
+        if (trimmedContent == lastRenderedContent && currentRenderState == RenderState.SUCCESS) {
+            AppLog.d("MermaidDisplayView: 内容相同且已渲染成功，跳过重新渲染")
+            callback?.invoke(true, null)
+            return
+        }
+        
+        // 更新内容
+        this.mermaidContent = trimmedContent
+        
         AppLog.d("MermaidDisplayView: 设置Mermaid内容，长度=${mermaidContent.length}")
+        
+        // 设置渲染状态为加载中
+        currentRenderState = RenderState.LOADING
         
         // 显示加载状态
         showLoading()
@@ -183,6 +208,7 @@ class MermaidDisplayView @JvmOverloads constructor(
             webView.loadUrl(MERMAID_TEMPLATE_FILE)
         } catch (e: Exception) {
             AppLog.e("MermaidDisplayView: 加载模板失败 - ${e.message}")
+            currentRenderState = RenderState.ERROR
             showError("加载模板失败: ${e.message}")
             renderCallback?.invoke(false, e.message)
         }
@@ -208,6 +234,7 @@ class MermaidDisplayView @JvmOverloads constructor(
             }
         } catch (e: Exception) {
             AppLog.e("MermaidDisplayView: 渲染失败 - ${e.message}")
+            currentRenderState = RenderState.ERROR
             showError("渲染失败: ${e.message}")
             renderCallback?.invoke(false, e.message)
         }
@@ -229,6 +256,12 @@ class MermaidDisplayView @JvmOverloads constructor(
         progressBar.visibility = GONE
         errorTextView.visibility = GONE
         webView.visibility = VISIBLE
+        
+        // 更新状态
+        currentRenderState = RenderState.SUCCESS
+        lastRenderedContent = mermaidContent
+        
+        AppLog.d("MermaidDisplayView: 渲染成功，已更新状态")
     }
 
     /**
@@ -239,6 +272,11 @@ class MermaidDisplayView @JvmOverloads constructor(
         errorTextView.text = message
         errorTextView.visibility = VISIBLE
         webView.visibility = GONE
+        
+        // 更新状态
+        currentRenderState = RenderState.ERROR
+        
+        AppLog.d("MermaidDisplayView: 渲染失败，已更新状态")
     }
 
     /**
@@ -280,11 +318,35 @@ class MermaidDisplayView @JvmOverloads constructor(
     fun getMermaidContent(): String = mermaidContent
 
     /**
+     * 获取当前渲染状态
+     */
+    fun getCurrentRenderState(): RenderState = currentRenderState
+
+    /**
+     * 检查是否已经渲染成功
+     */
+    fun isRendered(): Boolean = currentRenderState == RenderState.SUCCESS
+
+    /**
+     * 重置渲染状态（强制重新渲染）
+     */
+    fun resetRenderState() {
+        currentRenderState = RenderState.NONE
+        lastRenderedContent = ""
+        isPageReady = false
+        AppLog.d("MermaidDisplayView: 已重置渲染状态")
+    }
+
+    /**
      * 清理WebView资源
      */
     fun destroy() {
         try {
             webView.destroy()
+            // 重置状态
+            currentRenderState = RenderState.NONE
+            lastRenderedContent = ""
+            isPageReady = false
         } catch (e: Exception) {
             AppLog.e("MermaidDisplayView: 清理WebView失败 - ${e.message}")
         }

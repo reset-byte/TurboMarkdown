@@ -18,6 +18,8 @@ import com.github.turbomarkwon.util.AppLog
 import com.github.turbomarkwon.util.RecyclerViewPerformanceMonitor
 import com.google.android.material.snackbar.Snackbar
 import io.noties.markwon.Markwon
+import androidx.recyclerview.widget.RecyclerView
+import com.github.turbomarkwon.cache.MermaidRenderCache
 
 /**
  * 主Activity - 展示高性能Markdown渲染
@@ -66,12 +68,40 @@ class MainActivity : AppCompatActivity() {
             adapter = this@MainActivity.adapter
             setHasFixedSize(false)
             
-            // 性能优化配置
-            setItemViewCacheSize(20)
-            recycledViewPool.setMaxRecycledViews(0, 10)  // 段落类型
-            recycledViewPool.setMaxRecycledViews(1, 5)   // 标题类型
-            recycledViewPool.setMaxRecycledViews(2, 5)   // 代码块类型
-            recycledViewPool.setMaxRecycledViews(3, 8)   // 列表项类型
+            // 针对 Mermaid 图表优化的性能配置
+            setItemViewCacheSize(30)  // 增加缓存大小，特别针对代码块
+            
+            // 优化 ViewHolder 回收池 - 针对不同类型设置合适的缓存数量
+            recycledViewPool.setMaxRecycledViews(0, 12)  // 段落类型 (TYPE_PARAGRAPH)
+            recycledViewPool.setMaxRecycledViews(1, 6)   // 标题类型 (TYPE_HEADING)
+            recycledViewPool.setMaxRecycledViews(2, 13)   // 代码块类型 (TYPE_CODE_BLOCK) - 增加缓存
+            recycledViewPool.setMaxRecycledViews(3, 10)  // 列表项类型 (TYPE_LIST_ITEM)
+            recycledViewPool.setMaxRecycledViews(4, 4)   // 表格类型 (TYPE_TABLE)
+            recycledViewPool.setMaxRecycledViews(5, 3)   // 引用块类型 (TYPE_BLOCK_QUOTE)
+            recycledViewPool.setMaxRecycledViews(6, 2)   // 分隔线类型 (TYPE_THEMATIC_BREAK)
+            recycledViewPool.setMaxRecycledViews(7, 2)   // HTML块类型 (TYPE_HTML_BLOCK)
+            
+            // 设置滚动优化
+            isNestedScrollingEnabled = true
+            
+            // 添加滚动监听器，在滚动时暂停图片加载
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    
+                    when (newState) {
+                        RecyclerView.SCROLL_STATE_IDLE -> {
+                            // 滚动停止时恢复图片加载
+                            resumeImageLoading()
+                        }
+                        RecyclerView.SCROLL_STATE_DRAGGING,
+                        RecyclerView.SCROLL_STATE_SETTLING -> {
+                            // 滚动中暂停图片加载以提高性能
+                            pauseImageLoading()
+                        }
+                    }
+                }
+            })
         }
     }
     
@@ -340,7 +370,7 @@ class MainActivity : AppCompatActivity() {
             tvListItems.text = "${stats["lists"]}"
             tvTables.text = "${stats["tables"]}"
         }
-        
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogBinding.root)
             .setCancelable(true)
@@ -363,12 +393,38 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
     
+    /**
+     * 暂停图片加载以提高滚动性能
+     */
+    private fun pauseImageLoading() {
+        try {
+            // 暂停 Glide 图片加载
+            com.bumptech.glide.Glide.with(this).pauseRequests()
+        } catch (e: Exception) {
+            AppLog.d("Failed to pause image loading: ${e.message}")
+        }
+    }
+    
+    /**
+     * 恢复图片加载
+     */
+    private fun resumeImageLoading() {
+        try {
+            // 恢复 Glide 图片加载
+            com.bumptech.glide.Glide.with(this).resumeRequests()
+        } catch (e: Exception) {
+            AppLog.d("Failed to resume image loading: ${e.message}")
+        }
+    }
+    
     override fun onLowMemory() {
         super.onLowMemory()
         // 智能缓存清理
         com.github.turbomarkwon.cache.CachePerformanceAnalyzer.performSmartCacheCleanup()
         // 清理语法高亮缓存以释放内存
         com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+        // 清理 Mermaid 渲染缓存
+        MermaidRenderCache.smartCleanup()
     }
     
     override fun onDestroy() {
@@ -380,6 +436,9 @@ class MainActivity : AppCompatActivity() {
         
         // 清理语法高亮缓存
         com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+        
+        // 清理Mermaid 渲染缓存
+        MermaidRenderCache.clearAll()
         
         // 停止RecyclerView性能监控
         recyclerViewPerformanceMonitor?.stopMonitoring(binding.recyclerView)

@@ -28,6 +28,7 @@ import org.commonmark.ext.gfm.tables.TableHead
 import org.commonmark.ext.gfm.tables.TableRow
 import org.commonmark.ext.gfm.tables.TableCell
 import org.commonmark.node.*
+import com.github.turbomarkwon.cache.MermaidRenderCache
 
 /**
  * RecyclerView适配器 - 实现分块渲染Markdown内容
@@ -304,7 +305,9 @@ class MarkdownAdapter(
         private var codeDisplayView: CodeDisplayView? = null
         private var mermaidDisplayView: MermaidDisplayView? = null
         private var currentCodeHash: String? = null
-        
+        // 新增：全局缓存键
+        private var currentCacheKey: String? = null
+
         override fun bind(item: MarkdownItem, markwon: Markwon) {
             if (item is MarkdownItem.CodeBlock) {
                 AppLog.d("Binding CodeBlock item id=${item.id}, language=${item.language}")
@@ -368,29 +371,104 @@ class MarkdownAdapter(
                 else -> ""
             }
             
-            // 生成内容哈希值用于检查是否需要更新
-            val contentHash = "${mermaidContent.hashCode()}_mermaid"
+            // 生成全局缓存键
+            val globalCacheKey = MermaidRenderCache.generateCacheKey(mermaidContent)
+            currentCacheKey = globalCacheKey
             
+            // 检查全局缓存状态
+            when (MermaidRenderCache.getRenderState(globalCacheKey)) {
+                MermaidRenderCache.MermaidRenderState.SUCCESS -> {
+                    // 已成功渲染，可以直接复用
+                    AppLog.d("Mermaid diagram already rendered in global cache, reusing")
+                    reuseExistingMermaidView(mermaidContent, globalCacheKey)
+                }
+                MermaidRenderCache.MermaidRenderState.RENDERING -> {
+                    // 正在渲染中，等待完成
+                    AppLog.d("Mermaid diagram is being rendered, waiting...")
+                    createMermaidViewAndWait(mermaidContent, globalCacheKey)
+                }
+                MermaidRenderCache.MermaidRenderState.ERROR -> {
+                    // 之前渲染失败，重新尝试
+                    AppLog.d("Previous render failed, retrying...")
+                    createMermaidViewAndRender(mermaidContent, globalCacheKey)
+                }
+                MermaidRenderCache.MermaidRenderState.NONE -> {
+                    // 首次渲染
+                    AppLog.d("First time rendering this mermaid diagram")
+                    createMermaidViewAndRender(mermaidContent, globalCacheKey)
+                }
+            }
+        }
+        
+        /**
+         * 复用已存在的 Mermaid 视图
+         */
+        private fun reuseExistingMermaidView(mermaidContent: String, cacheKey: String) {
             // 创建或重用MermaidDisplayView
             if (mermaidDisplayView == null) {
                 mermaidDisplayView = MermaidDisplayView(binding.root.context)
                 binding.codeContainer.addView(mermaidDisplayView)
-                AppLog.d("Created new MermaidDisplayView for mermaid diagram")
+                AppLog.d("Created new MermaidDisplayView for cached diagram")
             }
             
-            // 只有当内容发生变化时才更新MermaidDisplayView
-            if (currentCodeHash != contentHash) {
-                mermaidDisplayView?.setMermaidContent(mermaidContent) { success, error ->
-                    if (success) {
-                        AppLog.d("Mermaid diagram rendered successfully")
-                    } else {
-                        AppLog.e("Mermaid diagram rendering failed: $error")
-                    }
+            // 设置内容，由于已缓存，内部会快速完成
+            mermaidDisplayView?.setMermaidContent(mermaidContent) { success, error ->
+                if (success) {
+                    AppLog.d("Successfully reused cached Mermaid diagram")
+                } else {
+                    AppLog.e("Failed to reuse cached Mermaid diagram: $error")
+                    // 如果复用失败，标记为需要重新渲染
+                    MermaidRenderCache.markRenderingError(cacheKey)
                 }
-                currentCodeHash = contentHash
-                AppLog.d("Updated mermaid content: length=${mermaidContent.length}")
-            } else {
-                AppLog.d("Mermaid content unchanged, skipping update")
+            }
+        }
+        
+        /**
+         * 创建 Mermaid 视图并等待渲染完成
+         */
+        private fun createMermaidViewAndWait(mermaidContent: String, cacheKey: String) {
+            // 创建或重用MermaidDisplayView
+            if (mermaidDisplayView == null) {
+                mermaidDisplayView = MermaidDisplayView(binding.root.context)
+                binding.codeContainer.addView(mermaidDisplayView)
+                AppLog.d("Created new MermaidDisplayView for waiting diagram")
+            }
+            
+            // 设置内容并等待渲染
+            mermaidDisplayView?.setMermaidContent(mermaidContent) { success, error ->
+                if (success) {
+                    MermaidRenderCache.markRenderingSuccess(cacheKey)
+                    AppLog.d("Mermaid diagram rendered successfully after waiting")
+                } else {
+                    MermaidRenderCache.markRenderingError(cacheKey)
+                    AppLog.e("Mermaid diagram rendering failed after waiting: $error")
+                }
+            }
+        }
+        
+        /**
+         * 创建 Mermaid 视图并开始渲染
+         */
+        private fun createMermaidViewAndRender(mermaidContent: String, cacheKey: String) {
+            // 创建或重用MermaidDisplayView
+            if (mermaidDisplayView == null) {
+                mermaidDisplayView = MermaidDisplayView(binding.root.context)
+                binding.codeContainer.addView(mermaidDisplayView)
+                AppLog.d("Created new MermaidDisplayView for new diagram")
+            }
+            
+            // 标记开始渲染
+            MermaidRenderCache.markRenderingStart(cacheKey)
+            
+            // 设置内容并开始渲染
+            mermaidDisplayView?.setMermaidContent(mermaidContent) { success, error ->
+                if (success) {
+                    MermaidRenderCache.markRenderingSuccess(cacheKey)
+                    AppLog.d("Mermaid diagram rendered successfully")
+                } else {
+                    MermaidRenderCache.markRenderingError(cacheKey)
+                    AppLog.e("Mermaid diagram rendering failed: $error")
+                }
             }
         }
         
@@ -411,11 +489,7 @@ class MarkdownAdapter(
         
         override fun onRecycled() {
             super.onRecycled()
-            // 清理CodeDisplayView和MermaidDisplayView
-            cleanupCodeView()
-            cleanupMermaidView()
-            currentCodeHash = null
-            AppLog.d("Recycled CodeBlockViewHolder")
+            AppLog.d("CodeBlockViewHolder onRecycled, currentCodeHash: $currentCodeHash")
         }
     }
 
