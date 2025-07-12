@@ -666,4 +666,176 @@ $$
 
 *本测试用例包含了各种数学公式的渲染测试，用于验证 TurboMarkdown 的数学公式渲染能力。*
 """
+    
+    /**
+     * 图片渲染测试用例
+     */
+    val IMAGE_RENDERING_TEST_MARKDOWN = """
+# 图片渲染测试
+
+## 实际应用场景测试
+
+### 应用推广场景
+
+**1. 100+ Real-Life Scenarios — From Zero to Fluent!**
+Structured from Level 0 to 2, making it easy to speak confidently in travel, work, or daily conversations!
+![image1](https://popaife.s3-accelerate.amazonaws.com/other/talkingLime-2025-07-01-01.webp)
+
+**2. Visual Vocabulary Learning + Instant Feedback**
+Master essential vocabulary through realistic scenarios.
+Tap any word to hear native pronunciation.Read aloud to reinforce memory and improve your pronunciation.
+![image2](https://popaife.s3-accelerate.amazonaws.com/other/talkingLime-2025-07-01-02.webp)
+
+**3. Contextual Phrase Training — Not Rote Memorization**
+No more boring drills — learn real phrases in real conversations.
+![image3](https://popaife.s3-accelerate.amazonaws.com/other/talkingLime-2025-07-01-03.webp)
+
+🧪 **Try the new experience now**
+and immerse yourself in speaking practice like never before!
+
+---
+
+## 图片格式兼容性测试
+
+### WebP 格式
+WebP 是 Google 开发的现代图片格式，具有更好的压缩率：
+![WebP示例](https://example.com/sample.webp)
+
+### PNG 格式
+PNG 格式支持透明度，适合图标和简单图形：
+![PNG示例](https://via.placeholder.com/400x300.png?text=PNG+Format+Test)
+
+### JPEG 格式
+JPEG 格式适合照片和复杂图像：
+![JPEG示例](https://via.placeholder.com/400x300.jpg?text=JPEG+Format+Test)
+
+### SVG 格式
+SVG 是矢量图形格式，支持无损缩放：
+![SVG示例](https://via.placeholder.com/400x300.svg?text=SVG+Format+Test)
+
+## 不同尺寸图片测试
+
+### 小尺寸图片 (100x100)
+![小图片](https://via.placeholder.com/100x100?text=Small+Image)
+
+### 中等尺寸图片 (400x300)
+![中等图片](https://via.placeholder.com/400x300?text=Medium+Image)
+
+### 大尺寸图片 (800x600)
+![大图片](https://via.placeholder.com/800x600?text=Large+Image)
+
+### 超宽图片 (1200x300)
+![超宽图片](https://via.placeholder.com/1200x300?text=Ultra+Wide+Image)
+
+### 超高图片 (300x1200)
+![超高图片](https://via.placeholder.com/300x1200?text=Ultra+Tall+Image)
+
+## 图片与文本混合布局测试
+
+### 图片在段落中间
+这是一段文本，用于测试图片与文本的混合布局效果。
+
+![中间图片](https://via.placeholder.com/400x200?text=Middle+Image)
+
+这是图片后面的文本，用于验证图片渲染后的文本布局是否正确。
+
+### 连续多张图片
+测试连续多张图片的渲染效果：
+
+![图片1](https://via.placeholder.com/300x200?text=Image+1)
+![图片2](https://via.placeholder.com/300x200?text=Image+2)
+![图片3](https://via.placeholder.com/300x200?text=Image+3)
+
+### 图片与列表结合
+- 列表项目1
+  ![列表图片1](https://via.placeholder.com/250x150?text=List+Image+1)
+- 列表项目2
+  ![列表图片2](https://via.placeholder.com/250x150?text=List+Image+2)
+- 列表项目3
+  ![列表图片3](https://via.placeholder.com/250x150?text=List+Image+3)
+
+## Alt 文本测试
+
+### 有Alt文本的图片
+![这是一个带有alt文本的示例图片](https://via.placeholder.com/400x300?text=With+Alt+Text)
+
+### 无Alt文本的图片
+![](https://via.placeholder.com/400x300?text=No+Alt+Text)
+
+### 长Alt文本的图片
+![这是一个非常长的alt文本描述，用于测试当图片无法加载时是否能正确显示这个很长的描述文本，包含中文和英文mixed content](https://via.placeholder.com/400x300?text=Long+Alt+Text)
+
+## 错误处理测试
+
+### 无效URL图片
+![无效URL](https://invalid-url.com/nonexistent-image.jpg)
+
+### 网络错误图片
+![网络错误](https://httpstat.us/404.jpg)
+
+### 超时图片
+![超时图片](https://httpstat.us/408.jpg)
+
+## 特殊字符URL测试
+
+### 包含空格的URL
+![空格URL](https://via.placeholder.com/400x300?text=URL+with+spaces)
+
+### 包含中文的URL
+![中文URL](https://via.placeholder.com/400x300?text=中文+URL)
+
+### 包含特殊符号的URL
+![特殊符号URL](https://via.placeholder.com/400x300?text=Special+%26+Symbols)
+
+## 性能测试场景
+
+### 高分辨率图片
+![高分辨率](https://via.placeholder.com/2048x1536?text=High+Resolution+Image)
+
+### Base64 编码图片
+![Base64图片](data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzMzNzNkYyIvPgogIDx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmaWxsPSJ3aGl0ZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iMC4zZW0iPkJhc2U2NCBJbWFnZTwvdGV4dD4KPC9zdmc+)
+
+### 动态生成图片
+![动态图片](https://picsum.photos/400/300?random=1)
+
+## 图片标题和链接测试
+
+### 带标题的图片
+![示例图片](https://via.placeholder.com/400x300?text=Image+with+Title "这是图片标题")
+
+### 可点击的图片
+[![可点击图片](https://via.placeholder.com/400x300?text=Clickable+Image)](https://example.com)
+
+### 带链接和标题的图片
+[![链接图片](https://via.placeholder.com/400x300?text=Linked+Image+with+Title "点击访问示例网站")](https://example.com)
+
+## 图片加载性能监控
+
+### 测试指标
+- **图片加载时间**: 从发起请求到图片完全加载的时间
+- **内存使用**: 图片解码后占用的内存大小
+- **缓存命中率**: 重复加载相同图片时的缓存使用情况
+- **网络使用**: 图片下载的网络流量统计
+
+### 性能优化策略
+1. **图片预加载**: 提前加载可能需要的图片
+2. **懒加载**: 仅在图片进入视口时才开始加载
+3. **尺寸适配**: 根据显示尺寸加载合适分辨率的图片
+4. **格式选择**: 根据图片内容选择最佳格式
+5. **压缩优化**: 在保证质量的前提下减少文件大小
+
+## 响应式图片测试
+
+### 不同密度屏幕适配
+在不同DPI的设备上，图片应该自动选择合适的分辨率：
+![响应式图片](https://via.placeholder.com/400x300?text=Responsive+Image)
+
+### 暗黑模式适配
+在暗黑模式下，某些图片可能需要特殊处理：
+![暗黑模式图片](https://via.placeholder.com/400x300/333333/ffffff?text=Dark+Mode+Image)
+
+---
+
+*本测试用例包含了各种图片渲染场景，用于验证 TurboMarkdown 的图片加载和渲染能力，包括性能优化和错误处理。*
+"""
 } 

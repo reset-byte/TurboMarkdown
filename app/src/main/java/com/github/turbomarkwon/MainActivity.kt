@@ -257,7 +257,8 @@ class MainActivity : AppCompatActivity() {
             "1、完整技术文档",
             "2、综合表格测试",
             "3、数学公式测试",
-            "4、性能统计"
+            "4、图片渲染测试",
+            "5、性能统计"
         )
         
         val dialog = AlertDialog.Builder(this)
@@ -267,7 +268,8 @@ class MainActivity : AppCompatActivity() {
                     0 -> loadTestCase(SampleMarkdown.SAMPLE_LONG_MARKDOWN, "完整技术文档")
                     1 -> loadTestCase(SampleMarkdown.COMPREHENSIVE_TABLE_TEST_MARKDOWN, "综合表格测试")
                     2 -> loadTestCase(SampleMarkdown.MATHEMATICAL_FORMULA_TEST_MARKDOWN, "数学公式测试")
-                    3 -> showPerformanceDialog()
+                    3 -> loadTestCase(SampleMarkdown.IMAGE_RENDERING_TEST_MARKDOWN, "图片渲染测试")
+                    4 -> showPerformanceDialog()
                 }
             }
             .setNegativeButton("取消", null)
