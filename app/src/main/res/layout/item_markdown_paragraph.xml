@@ -14,7 +14,6 @@
         android:textSize="16sp"
         android:lineSpacingExtra="4dp"
         android:fontFamily="sans-serif"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="This is a sample paragraph text that shows how markdown content will be displayed." />

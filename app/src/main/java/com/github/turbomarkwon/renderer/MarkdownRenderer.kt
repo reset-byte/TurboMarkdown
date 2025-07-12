@@ -1,7 +1,6 @@
 package com.github.turbomarkwon.renderer
 
 import android.widget.TextView
-import android.text.Spanned
 import com.github.turbomarkwon.cache.LightweightMarkdownCache
 import com.github.turbomarkwon.cache.CachePerformanceAnalyzer
 import io.noties.markwon.Markwon

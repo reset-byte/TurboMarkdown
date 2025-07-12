@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
 
 ```kotlin
 // 创建优化的Markwon实例
-val markwon = MarkwonConfig.createOptimizedMarkwon(context)
+val markwon = MarkdownUtils.getOptimizedMarkwon(context)
 
 // 配置RecyclerView
 recyclerView.apply {
@@ -367,7 +367,7 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
     /**
      * 综合表格测试用例
      */
-    const val COMPREHENSIVE_TABLE_TEST_MARKDOWN = """
+    val COMPREHENSIVE_TABLE_TEST_MARKDOWN = """
 # 综合表格测试
 
 ## 混合列数测试
@@ -435,5 +435,235 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
 - **1-3列表格**：使用80%屏幕宽度，智能滚动条
 - **4+列表格**：使用120%屏幕宽度，强制滚动条
 - **所有表格**：保持流畅的水平滑动体验
+"""
+    
+    /**
+     * 数学公式渲染测试用例
+     */
+    val MATHEMATICAL_FORMULA_TEST_MARKDOWN = """
+# 数学公式渲染测试
+
+## 基本数学符号测试
+
+### 行内公式
+这是一个行内公式示例：质能方程 ${'$'}E = mc^2${'$'}，其中 ${'$'}E${'$'} 是能量，${'$'}m${'$'} 是质量，${'$'}c${'$'} 是光速。
+
+另一个行内公式：勾股定理 ${'$'}a^2 + b^2 = c^2${'$'}，以及欧拉公式 ${'$'}e^{i\pi} + 1 = 0${'$'}。
+
+### 块级公式
+
+#### 基本运算
+${'$'}${'$'}
+\begin{align}
+a + b &= c \\
+a - b &= d \\
+a \times b &= e \\
+a \div b &= f
+\end{align}
+${'$'}${'$'}
+
+#### 分数和根号
+$$
+\frac{a}{b} = \frac{c}{d} \quad \text{和} \quad \sqrt{a^2 + b^2} = c
+$$
+
+$$
+\frac{x^2 + 2x + 1}{x - 1} = \frac{(x+1)^2}{x-1}
+$$
+
+#### 上下标
+$$
+x^2 + y^2 = r^2 \quad \text{和} \quad H_2O + NaCl
+$$
+
+$$
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$
+
+## 高级数学公式
+
+### 积分和导数
+$$
+\int_0^1 x^2 dx = \frac{1}{3}
+$$
+
+$$
+\frac{d}{dx} \sin(x) = \cos(x)
+$$
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}
+$$
+
+### 求和和乘积
+$$
+\sum_{k=1}^{n} k^2 = \frac{n(n+1)(2n+1)}{6}
+$$
+
+$$
+\prod_{i=1}^{n} i = n!
+$$
+
+### 极限
+$$
+\lim_{x \to 0} \frac{\sin x}{x} = 1
+$$
+
+$$
+\lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e
+$$
+
+## 矩阵和线性代数
+
+### 矩阵表示
+$$
+A = \begin{pmatrix}
+a_{11} & a_{12} & a_{13} \\
+a_{21} & a_{22} & a_{23} \\
+a_{31} & a_{32} & a_{33}
+\end{pmatrix}
+$$
+
+### 行列式
+$$
+\det(A) = \begin{vmatrix}
+a & b & c \\
+d & e & f \\
+g & h & i
+\end{vmatrix} = a(ei - fh) - b(di - fg) + c(dh - eg)
+$$
+
+### 向量
+$$
+\vec{v} = \begin{pmatrix} x \\ y \\ z \end{pmatrix} \quad \text{和} \quad \vec{u} \cdot \vec{v} = |\vec{u}||\vec{v}|\cos\theta
+$$
+
+## 希腊字母和特殊符号
+
+### 希腊字母
+$$
+\alpha, \beta, \gamma, \delta, \epsilon, \zeta, \eta, \theta, \iota, \kappa, \lambda, \mu
+$$
+
+$$
+\nu, \xi, \omicron, \pi, \rho, \sigma, \tau, \upsilon, \phi, \chi, \psi, \omega
+$$
+
+$$
+\Gamma, \Delta, \Theta, \Lambda, \Xi, \Pi, \Sigma, \Upsilon, \Phi, \Psi, \Omega
+$$
+
+### 特殊运算符
+$$
+\nabla \cdot \vec{F} = \frac{\partial F_x}{\partial x} + \frac{\partial F_y}{\partial y} + \frac{\partial F_z}{\partial z}
+$$
+
+$$
+\forall x \in \mathbb{R}, \exists y \in \mathbb{R} \text{ such that } x + y = 0
+$$
+
+## 复杂公式组合
+
+### 傅里叶变换
+$$
+F(\omega) = \int_{-\infty}^{\infty} f(t) e^{-i\omega t} dt
+$$
+
+### 薛定谔方程
+$$
+i\hbar \frac{\partial}{\partial t} \Psi(x,t) = \hat{H} \Psi(x,t)
+$$
+
+### 麦克斯韦方程组
+$$
+\begin{align}
+\nabla \cdot \vec{E} &= \frac{\rho}{\epsilon_0} \\
+\nabla \cdot \vec{B} &= 0 \\
+\nabla \times \vec{E} &= -\frac{\partial \vec{B}}{\partial t} \\
+\nabla \times \vec{B} &= \mu_0 \vec{J} + \mu_0 \epsilon_0 \frac{\partial \vec{E}}{\partial t}
+\end{align}
+$$
+
+### 概率论
+$$
+P(A|B) = \frac{P(B|A)P(A)}{P(B)}
+$$
+
+$$
+f(x) = \frac{1}{\sigma\sqrt{2\pi}} e^{-\frac{1}{2}\left(\frac{x-\mu}{\sigma}\right)^2}
+$$
+
+## 数学证明示例
+
+### 欧拉恒等式推导
+设 ${'$'}z = e^{i\theta}${'$'}，则：
+$$
+z = \cos\theta + i\sin\theta
+$$
+
+当 $\theta = \pi$ 时：
+$$
+e^{i\pi} = \cos\pi + i\sin\pi = -1 + 0i = -1
+$$
+
+因此：
+$$
+e^{i\pi} + 1 = 0
+$$
+
+### 微积分基本定理
+如果 ${'$'}f${'$'} 在 ${'$'}[a,b]${'$'} 上连续，且 ${'$'}F'(x) = f(x)${'$'}，则：
+$$
+\int_a^b f(x) dx = F(b) - F(a)
+$$
+
+## 工程数学应用
+
+### 控制系统
+$$
+G(s) = \frac{K}{s(s+1)(s+2)}
+$$
+
+$$
+H(s) = \frac{1}{1 + G(s)}
+$$
+
+### 信号处理
+$$
+X(f) = \int_{-\infty}^{\infty} x(t) e^{-2\pi i f t} dt
+$$
+
+### 统计学
+$$
+\bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i
+$$
+
+$$
+s^2 = \frac{1}{n-1} \sum_{i=1}^{n} (x_i - \bar{x})^2
+$$
+
+## 性能测试公式
+
+### 算法复杂度
+$$
+T(n) = O(n \log n) \quad \text{快速排序平均时间复杂度}
+$$
+
+$$
+S(n) = O(n) \quad \text{空间复杂度}
+$$
+
+### 渲染性能指标
+$$
+\text{FPS} = \frac{1}{\text{Frame Time}} \times 1000
+$$
+
+$$
+\text{Memory Usage} = \frac{\text{Used Memory}}{\text{Total Memory}} \times 100\%
+$$
+
+---
+
+*本测试用例包含了各种数学公式的渲染测试，用于验证 TurboMarkdown 的数学公式渲染能力。*
 """
 } 

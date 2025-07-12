@@ -7,7 +7,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.github.turbomarkwon.adapter.MarkdownAdapter
-import com.github.turbomarkwon.config.MarkwonConfig
+import com.github.turbomarkwon.util.MarkdownUtils
 import com.github.turbomarkwon.data.MarkdownRenderState
 import com.github.turbomarkwon.data.SampleMarkdown
 import com.github.turbomarkwon.databinding.ActivityMainBinding
@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
      * 设置Markwon实例
      */
     private fun setupMarkwon() {
-        markwon = MarkwonConfig.createOptimizedMarkwon(this)
+        markwon = MarkdownUtils.getOptimizedMarkwon(this)
     }
     
     /**
@@ -256,7 +256,8 @@ class MainActivity : AppCompatActivity() {
         val options = arrayOf(
             "1、完整技术文档",
             "2、综合表格测试",
-            "3、性能统计"
+            "3、数学公式测试",
+            "4、性能统计"
         )
         
         val dialog = AlertDialog.Builder(this)
@@ -265,7 +266,8 @@ class MainActivity : AppCompatActivity() {
                 when (which) {
                     0 -> loadTestCase(SampleMarkdown.SAMPLE_LONG_MARKDOWN, "完整技术文档")
                     1 -> loadTestCase(SampleMarkdown.COMPREHENSIVE_TABLE_TEST_MARKDOWN, "综合表格测试")
-                    2 -> showPerformanceDialog()
+                    2 -> loadTestCase(SampleMarkdown.MATHEMATICAL_FORMULA_TEST_MARKDOWN, "数学公式测试")
+                    3 -> showPerformanceDialog()
                 }
             }
             .setNegativeButton("取消", null)

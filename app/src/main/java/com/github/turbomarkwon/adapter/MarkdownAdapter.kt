@@ -20,11 +20,13 @@ import org.commonmark.node.IndentedCodeBlock
 import android.view.View
 import android.view.MotionEvent
 import android.widget.HorizontalScrollView
+import com.github.turbomarkwon.util.MarkdownUtils
 import kotlin.math.abs
 import org.commonmark.ext.gfm.tables.TableBlock
 import org.commonmark.ext.gfm.tables.TableHead
 import org.commonmark.ext.gfm.tables.TableRow
 import org.commonmark.ext.gfm.tables.TableCell
+import org.commonmark.node.*
 
 /**
  * RecyclerView适配器 - 实现分块渲染Markdown内容
@@ -102,7 +104,9 @@ class MarkdownAdapter(
     }
 
     override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
-        holder.bind(getItem(position), markwon)
+        val item = getItem(position)
+        AppLog.d("MarkdownAdapter: 绑定项目类型: ${item.javaClass.simpleName}, ID: ${item.id}")
+        holder.bind(item, markwon)
     }
 
     override fun onViewRecycled(holder: BaseViewHolder) {
@@ -121,7 +125,154 @@ class MarkdownAdapter(
     class ParagraphViewHolder(private val binding: ItemMarkdownParagraphBinding) : BaseViewHolder(binding.root) {
         override fun bind(item: MarkdownItem, markwon: Markwon) {
             if (item is MarkdownItem.Paragraph) {
-                MarkdownRenderer.renderNode(item.node, binding.textView, markwon)
+                // 重构节点内容为markdown格式，保留换行符和格式信息
+                val nodeContent = reconstructMarkdownFromNode(item.node)
+                
+                // 添加调试日志
+                AppLog.d("ParagraphViewHolder: 处理段落内容: ${nodeContent.take(100)}...")
+                
+                // 检查是否包含数学公式
+                val hasMathFormula = containsMathFormula(nodeContent)
+                AppLog.d("ParagraphViewHolder: 是否包含数学公式: $hasMathFormula")
+                
+                if (hasMathFormula) {
+                    // 使用增强渲染处理数学公式
+                    AppLog.d("ParagraphViewHolder: 使用增强渲染处理数学公式")
+                    MarkdownUtils.renderEnhancedToTextView(binding.textView, nodeContent)
+                } else {
+                    // 使用常规渲染
+                    AppLog.d("ParagraphViewHolder: 使用常规渲染")
+                    MarkdownRenderer.renderNode(item.node, binding.textView, markwon)
+                }
+            }
+        }
+        
+        /**
+         * 从节点重构markdown内容，保留格式信息
+         */
+        private fun reconstructMarkdownFromNode(node: Node): String {
+            val result = processNodeToMarkdown(node)
+            // 修复 LaTeX 反斜杠转义问题：将单个 \ 恢复为正确的 LaTeX 格式
+            return fixLatexEscaping(result)
+        }
+        
+        /**
+         * 修复 LaTeX 转义问题
+         */
+        private fun fixLatexEscaping(content: String): String {
+            // 对于包含数学公式的内容，修复反斜杠转义
+            if (!content.contains("$$")) {
+                return content
+            }
+            
+            AppLog.d("ParagraphViewHolder: 修复前的内容: $content")
+            
+            // 在数学公式块中修复转义
+            val result = content.replace(Regex("(\\$\\$[\\s\\S]*?\\$\\$)")) { match ->
+                val mathContent = match.value
+                AppLog.d("ParagraphViewHolder: 处理数学内容: $mathContent")
+                
+                // 专门修复矩阵换行符问题：将行末的单个 \ 修复为 \\
+                val fixed = mathContent
+                    // 修复矩阵/表格中的换行符：\ 后跟换行或空白应该是 \\
+                    .replace(Regex("\\\\\\s*\n")) { match ->
+                        "\\\\\\\\${match.value.substring(1)}"
+                    }
+                    // 修复其他行末的单个反斜杠
+                    .replace(Regex("([^\\\\])\\\\(\\s*\n)")) { match ->
+                        "${match.groupValues[1]}\\\\\\\\${match.groupValues[2]}"
+                    }
+                
+                AppLog.d("ParagraphViewHolder: 修复后的数学内容: $fixed")
+                fixed
+            }
+            
+            AppLog.d("ParagraphViewHolder: 修复后的完整内容: $result")
+            return result
+        }
+        
+        /**
+         * 递归处理节点转换为markdown
+         */
+        private fun processNodeToMarkdown(node: Node): String {
+            val content = StringBuilder()
+            
+            when (node) {
+                is Text -> {
+                    content.append(node.literal)
+                }
+                is Code -> {
+                    content.append("`").append(node.literal).append("`")
+                }
+                is Emphasis -> {
+                    content.append("*")
+                    processChildren(node, content)
+                    content.append("*")
+                }
+                is StrongEmphasis -> {
+                    content.append("**")
+                    processChildren(node, content)
+                    content.append("**")
+                }
+                is Link -> {
+                    content.append("[")
+                    processChildren(node, content)
+                    content.append("](").append(node.destination).append(")")
+                }
+                is Image -> {
+                    content.append("![")
+                    processChildren(node, content)
+                    content.append("](").append(node.destination).append(")")
+                }
+                is HardLineBreak -> {
+                    content.append("\n")
+                }
+                is SoftLineBreak -> {
+                    content.append("\n")
+                }
+                is HtmlInline -> {
+                    content.append(node.literal)
+                }
+                else -> {
+                    // 处理其他节点类型，直接处理子节点
+                    processChildren(node, content)
+                }
+            }
+            
+            return content.toString()
+        }
+        
+        /**
+         * 处理子节点
+         */
+        private fun processChildren(parentNode: Node, content: StringBuilder) {
+            var child = parentNode.firstChild
+            while (child != null) {
+                content.append(processNodeToMarkdown(child))
+                child = child.next
+            }
+        }
+        
+        /**
+         * 检查文本是否包含数学公式
+         */
+        private fun containsMathFormula(text: String): Boolean {
+            // 检查常见的数学公式标记
+            val mathPatterns = listOf(
+                "\\$\\$[\\s\\S]*?\\$\\$",  // 块级公式 $$...$$
+                "\\$[^\\$\\n]*?\\$",      // 行内公式 $...$
+                "\\\\\\([\\s\\S]*?\\\\\\)", // LaTeX 行内公式 \(...\)
+                "\\\\\\[[\\s\\S]*?\\\\\\]", // LaTeX 块级公式 \[...\]
+                "\\\\[a-zA-Z]+",          // LaTeX 命令
+                "\\\\(frac|sqrt|sum|int|lim|infty|partial|nabla|alpha|beta|gamma|delta|epsilon|theta|lambda|mu|pi|sigma|omega|begin|end|pmatrix|bmatrix|vmatrix|matrix)" // 常见数学符号和矩阵
+            )
+            
+            return mathPatterns.any { pattern ->
+                try {
+                    text.contains(Regex(pattern))
+                } catch (e: Exception) {
+                    false
+                }
             }
         }
     }
