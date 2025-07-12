@@ -6,17 +6,33 @@ object AppLog {
     const val TAG = "yangtianbin"
 
     fun d(message: String) {
-        Log.d(TAG, message)
+        try {
+            Log.d(TAG, message)
+        } catch (e: RuntimeException) {
+            // 在单元测试环境中，使用println代替Log
+            println("D/$TAG: $message")
+        }
     }
 
     fun e(message: String, throwable: Throwable? = null) {
-        Log.e(TAG, message, throwable)
+        try {
+            Log.e(TAG, message, throwable)
+        } catch (e: RuntimeException) {
+            // 在单元测试环境中，使用println代替Log
+            println("E/$TAG: $message")
+            throwable?.printStackTrace()
+        }
     }
 
     /**
      * 缓存统计日志
      */
     fun cache(message: String) {
-        Log.d("$TAG-CACHE", message)
+        try {
+            Log.d("$TAG-CACHE", message)
+        } catch (e: RuntimeException) {
+            // 在单元测试环境中，使用println代替Log
+            println("D/$TAG-CACHE: $message")
+        }
     }
 } 

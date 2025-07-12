@@ -208,12 +208,12 @@ function optimizePerformance() {
 
 #### 表格
 
-| 功能 | 传统方案 | TurboMarkdown | 性能提升 |
-|------|----------|---------------|----------|
-| 解析速度 | 慢 | 快 | 300% |
-| 内存使用 | 高 | 低 | 50% |
-| 滚动流畅度 | 卡顿 | 流畅 | 显著提升 |
-| 图片加载 | 阻塞 | 异步 | 完全不阻塞 |
+| 功能 | 传统方案 | TurboMarkdown | 性能提升 | 兼容性 | 稳定性 | 易用性 | 可扩展性 | 社区支持 |
+|------|----------|---------------|----------|--------|--------|--------|----------|----------|
+| 解析速度 | 慢 | 快 | 300% | 良好 | 稳定 | 简单 | 强 | 活跃 |
+| 内存使用 | 高 | 低 | 50% | 兼容 | 可靠 | 友好 | 灵活 | 完善 |
+| 滚动流畅度 | 卡顿 | 流畅 | 显著提升 | 全面 | 优秀 | 直观 | 丰富 | 及时 |
+| 图片加载 | 阻塞 | 异步 | 完全不阻塞 | 广泛 | 健壮 | 便捷 | 模块化 | 专业 |
 
 #### 分隔线
 
@@ -365,111 +365,75 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
 """.trimIndent()
     
     /**
-     * 简单示例
+     * 综合表格测试用例
      */
-    const val SIMPLE_MARKDOWN = """
-# 简单示例
+    const val COMPREHENSIVE_TABLE_TEST_MARKDOWN = """
+# 综合表格测试
 
-这是一个简单的Markdown示例。
+## 混合列数测试
 
-## 普通引用块
+这个测试包含了从1列到7列的各种表格，用于验证不同列数的优化效果。
 
-> 这是一个普通的引用块
-> 它包含多行文本
+### 1列表格
 
-## 包含缩进代码块的引用块
+| 单列内容 |
+|---------|
+| 项目1 |
+| 项目2 |
+| 项目3 |
 
-> 下面是一个Kotlin代码示例：
-> 
->     // 解析Markdown为AST节点
->     val document = parser.parse(markdownText)
->     val items = parseDocument(document)
->     
->     // 为每个节点创建对应的ViewHolder
->     when (child) {
->         is Paragraph -> MarkdownItem.Paragraph(id, child)
->         is Heading -> MarkdownItem.Heading(id, child, level)
->         is CodeBlock -> MarkdownItem.CodeBlock(id, child, language)
->         // ... 其他类型
->     }
+### 2列表格
 
-## 包含围栏代码块的引用块
+| 功能 | 状态 |
+|------|------|
+| 解析 | ✅ |
+| 渲染 | ✅ |
+| 缓存 | ✅ |
 
-> 这是一个围栏代码块示例：
-> 
-> ```kotlin
-> fun processMarkdown(text: String): List<MarkdownItem> {
->     val parser = Parser.builder().build()
->     val document = parser.parse(text)
->     return parseDocument(document)
-> }
-> ```
+### 3列表格
 
-## 总结
+| 功能 | 状态 | 备注 |
+|------|------|------|
+| 解析 | ✅ | 完成 |
+| 渲染 | ✅ | 完成 |
+| 缓存 | ✅ | 完成 |
 
-这个示例展示了不同类型的代码块在引用块中的使用。
-"""
+### 4列表格
 
-    /**
-     * 代码块缓存测试示例
-     */
-    const val CODE_CACHE_TEST_MARKDOWN = """
-# 代码块缓存测试
+| 功能 | 状态 | 备注 | 性能 |
+|------|------|------|------|
+| 解析 | ✅ | 完成 | A+ |
+| 渲染 | ✅ | 完成 | A+ |
+| 缓存 | ✅ | 完成 | A |
 
-## 独立的Kotlin代码块
+### 5列表格
 
-```kotlin
-fun testCaching() {
-    val message = "Hello, World!"
-    println(message)
-    
-    // 测试缓存机制
-    repeat(5) {
-        println("Iteration: ${'$'}it")
-    }
-}
-```
+| 功能 | 状态 | 备注 | 性能 | 内存 |
+|------|------|------|------|------|
+| 解析 | ✅ | 完成 | A+ | 优秀 |
+| 渲染 | ✅ | 完成 | A+ | 优秀 |
+| 缓存 | ✅ | 完成 | A | 良好 |
 
-## 独立的Java代码块
+### 6列表格
 
-```java
-public class CacheTest {
-    public static void main(String[] args) {
-        System.out.println("Testing cache mechanism");
-        
-        for (int i = 0; i < 5; i++) {
-            System.out.println("Iteration: " + i);
-        }
-    }
-}
-```
+| 功能 | 状态 | 备注 | 性能 | 内存 | 兼容性 |
+|------|------|------|------|------|--------|
+| 解析 | ✅ | 完成 | A+ | 优秀 | 优秀 |
+| 渲染 | ✅ | 完成 | A+ | 优秀 | 优秀 |
+| 缓存 | ✅ | 完成 | A | 良好 | 良好 |
 
-## 缩进代码块
+### 7列表格
 
-    // 这是一个缩进代码块
-    val data = listOf(1, 2, 3, 4, 5)
-    data.forEach { println(it) }
+| 功能 | 状态 | 备注 | 性能 | 内存 | 兼容性 | 优化 |
+|------|------|------|------|------|--------|------|
+| 解析 | ✅ | 完成 | A+ | 优秀 | 优秀 | 是 |
+| 渲染 | ✅ | 完成 | A+ | 优秀 | 优秀 | 是 |
+| 缓存 | ✅ | 完成 | A | 良好 | 良好 | 是 |
 
-## 普通段落
+## 优化策略总结
 
-这是一个普通段落，用于测试混合内容。
-
-## 另一个Kotlin代码块（重复测试缓存）
-
-```kotlin
-fun testCaching() {
-    val message = "Hello, World!"
-    println(message)
-    
-    // 测试缓存机制
-    repeat(5) {
-        println("Iteration: ${'$'}it")
-    }
-}
-```
-
-## 总结
-
-这个测试包含了多种类型的代码块，用于验证缓存机制的有效性。
+- **1-3列表格**：使用80%屏幕宽度，智能滚动条
+- **4+列表格**：使用120%屏幕宽度，强制滚动条
+- **所有表格**：保持流畅的水平滑动体验
 """
 } 

@@ -42,7 +42,6 @@ class MainActivity : AppCompatActivity() {
         setupMarkwon()
         setupRecyclerView()
         setupViewModel()
-        setupSwipeRefresh()
         setupFab()
         setupRecyclerViewPerformanceMonitor()
         loadSampleMarkdown()
@@ -92,7 +91,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 android.view.View.GONE
             }
-            binding.swipeRefreshLayout.isRefreshing = isLoading
         }
         
         // 观察错误信息
@@ -117,11 +115,6 @@ class MainActivity : AppCompatActivity() {
                     val currentTime = System.currentTimeMillis()
                     val totalStartupTime = currentTime - startupTime
                     viewModel.setStartupTime(totalStartupTime)
-                    
-                    // 3秒后自动显示性能统计
-                    binding.root.postDelayed({
-                        showPerformanceDialog()
-                    }, 3000)
                 }
                 is MarkdownRenderState.Error -> {
                     AppLog.e("Parse error", state.exception)
@@ -141,20 +134,17 @@ class MainActivity : AppCompatActivity() {
     }
     
     /**
-     * 设置下拉刷新
-     */
-    private fun setupSwipeRefresh() {
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            viewModel.refresh()
-        }
-    }
-    
-    /**
      * 设置悬浮按钮
      */
     private fun setupFab() {
         binding.fabStats.setOnClickListener {
             showPerformanceDialog()
+        }
+        
+        // 长按显示测试选项
+        binding.fabStats.setOnLongClickListener {
+            showTestOptionsDialog()
+            true
         }
     }
     
@@ -191,8 +181,6 @@ class MainActivity : AppCompatActivity() {
         }
         AppLog.d("RecyclerView performance monitor initialized")
     }
-    
-
     
     /**
      * 更新帧率UI显示
@@ -257,15 +245,54 @@ class MainActivity : AppCompatActivity() {
      * 加载示例Markdown内容
      */
     private fun loadSampleMarkdown() {
-        // 这里可以选择加载不同的示例
-        val useSimple = intent.getBooleanExtra("simple", false)
-        val testCache = intent.getBooleanExtra("cache_test", false)
+        // 加载默认的完整技术文档
+        viewModel.loadMarkdown(SampleMarkdown.SAMPLE_LONG_MARKDOWN)
+    }
+    
+    /**
+     * 显示测试选项Dialog
+     */
+    private fun showTestOptionsDialog() {
+        val options = arrayOf(
+            "1、完整技术文档",
+            "2、综合表格测试",
+            "3、性能统计"
+        )
         
-        val markdown = when {
-            testCache -> SampleMarkdown.CODE_CACHE_TEST_MARKDOWN
-            useSimple -> SampleMarkdown.SIMPLE_MARKDOWN
-            else -> SampleMarkdown.SAMPLE_LONG_MARKDOWN
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("选择测试用例")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> loadTestCase(SampleMarkdown.SAMPLE_LONG_MARKDOWN, "完整技术文档")
+                    1 -> loadTestCase(SampleMarkdown.COMPREHENSIVE_TABLE_TEST_MARKDOWN, "综合表格测试")
+                    2 -> showPerformanceDialog()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .create()
+        
+        dialog.window?.setBackgroundDrawableResource(R.drawable.bg_dialog_rounded)
+        
+        // 设置左右margin为16dp
+        dialog.window?.let { window ->
+            val params = window.attributes
+            val margin = (16 * resources.displayMetrics.density).toInt()
+            params.width = resources.displayMetrics.widthPixels - 2 * margin
+            window.attributes = params
         }
+        
+        dialog.show()
+    }
+    
+    /**
+     * 加载指定的测试用例
+     */
+    private fun loadTestCase(markdown: String, caseName: String) {
+        AppLog.d("Loading test case: $caseName")
+        Snackbar.make(binding.root, "加载测试用例: $caseName", Snackbar.LENGTH_SHORT).show()
+        
+        // 重置启动时间以测量新的加载时间
+        startupTime = System.currentTimeMillis()
         
         viewModel.loadMarkdown(markdown)
     }
@@ -311,6 +338,16 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogBinding.root)
             .setCancelable(true)
             .create()
+        
+        dialog.window?.setBackgroundDrawableResource(R.drawable.bg_dialog_rounded)
+        
+        // 设置左右margin为16dp
+        dialog.window?.let { window ->
+            val params = window.attributes
+            val margin = (16 * resources.displayMetrics.density).toInt()
+            params.width = resources.displayMetrics.widthPixels - 2 * margin
+            window.attributes = params
+        }
         
         dialogBinding.btnClose.setOnClickListener {
             dialog.dismiss()

@@ -132,23 +132,6 @@ class MarkdownViewModel : ViewModel() {
     }
     
     /**
-     * 刷新内容
-     */
-    fun refresh() {
-        val currentItems = _markdownItems.value
-        if (currentItems != null) {
-            // 清理所有缓存并重新加载
-            MarkdownRenderer.clearCache()
-            LightweightMarkdownCache.clearAll()
-            CachePerformanceAnalyzer.reset()
-            
-            // 这里可以重新加载原始Markdown文本
-            // 为了简化，我们只是重新设置当前项目
-            _markdownItems.value = currentItems
-        }
-    }
-    
-    /**
      * 清理资源
      */
     override fun onCleared() {
