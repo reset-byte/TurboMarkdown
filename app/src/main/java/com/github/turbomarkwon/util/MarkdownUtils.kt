@@ -3,6 +3,7 @@ package com.github.turbomarkwon.util
 import android.content.Context
 import android.graphics.Color
 import android.widget.TextView
+import com.github.turbomarkwon.customcontainer.ContainerPlugin
 import com.github.turbomarkwon.customtag.CustomTagPlugin
 import io.noties.markwon.Markwon
 import io.noties.markwon.SoftBreakAddsNewLinePlugin
@@ -127,6 +128,7 @@ object MarkdownUtils {
         val glidePlugin = GlideImagesPlugin.create(context)
         val tablePlugin = TablePlugin.create(tableTheme)
         val htmlPlugin = CustomTagPlugin.create()  // 使用自定义标签插件
+        val containerPlugin = ContainerPlugin.create()  // 添加容器插件
         val taskListPlugin = TaskListPlugin.create(context)
         val softBreakPlugin = SoftBreakAddsNewLinePlugin.create()
         val movementMethodPlugin = MovementMethodPlugin.create(TableAwareMovementMethod.create())
@@ -138,6 +140,7 @@ object MarkdownUtils {
             .usePlugin(softBreakPlugin)
             .usePlugin(glidePlugin)
             .usePlugin(tablePlugin)
+            .usePlugin(containerPlugin)
             .usePlugin(htmlPlugin)
             .usePlugin(taskListPlugin)
             .usePlugin(movementMethodPlugin)

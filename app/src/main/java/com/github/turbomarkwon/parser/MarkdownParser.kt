@@ -2,6 +2,8 @@ package com.github.turbomarkwon.parser
 
 import com.github.turbomarkwon.data.MarkdownItem
 import com.github.turbomarkwon.data.MarkdownParseResult
+import com.github.turbomarkwon.customcontainer.ContainerNode
+import com.github.turbomarkwon.customcontainer.ContainerBlockParserFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.commonmark.node.*
@@ -16,6 +18,7 @@ class MarkdownParser {
     
     private val parser: Parser = Parser.builder()
         .extensions(listOf(TablesExtension.create()))
+        .customBlockParserFactory(ContainerBlockParserFactory())
         .build()
     
     suspend fun parseMarkdownAsync(markdownText: String): MarkdownParseResult = withContext(Dispatchers.Default) {
@@ -41,6 +44,8 @@ class MarkdownParser {
         var child = document.firstChild
         
         while (child != null) {
+            AppLog.d("MarkdownParser: 处理节点类型: ${child.javaClass.simpleName}")
+            
             when (child) {
                 is Paragraph -> {
                     items.add(MarkdownItem.Paragraph(
@@ -100,7 +105,17 @@ class MarkdownParser {
                         node = child
                     ))
                 }
+                is ContainerNode -> {
+                    AppLog.d("MarkdownParser: 找到容器节点 - 类型: ${child.containerType}, 标题: ${child.title}")
+                    items.add(MarkdownItem.Container(
+                        id = generateId(),
+                        node = child,
+                        containerType = child.containerType,
+                        title = child.title
+                    ))
+                }
                 else -> {
+                    AppLog.d("MarkdownParser: 未知节点类型，作为段落处理: ${child.javaClass.simpleName}")
                     items.add(MarkdownItem.Paragraph(
                         id = generateId(),
                         node = child
@@ -110,6 +125,7 @@ class MarkdownParser {
             child = child.next
         }
         
+        AppLog.d("MarkdownParser: 解析完成，总共 ${items.size} 个项目")
         return items
     }
     

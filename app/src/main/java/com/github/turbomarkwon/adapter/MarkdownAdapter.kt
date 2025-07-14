@@ -11,6 +11,7 @@ import com.github.turbomarkwon.databinding.ItemMarkdownHeadingBinding
 import com.github.turbomarkwon.databinding.ItemMarkdownListBinding
 import com.github.turbomarkwon.databinding.ItemMarkdownParagraphBinding
 import com.github.turbomarkwon.databinding.ItemMarkdownTableBinding
+import com.github.turbomarkwon.databinding.ItemMarkdownContainerBinding
 import com.github.turbomarkwon.renderer.MarkdownRenderer
 import io.noties.markwon.Markwon
 import com.github.turbomarkwon.util.AppLog
@@ -29,6 +30,11 @@ import org.commonmark.ext.gfm.tables.TableRow
 import org.commonmark.ext.gfm.tables.TableCell
 import org.commonmark.node.*
 import com.github.turbomarkwon.cache.MermaidRenderCache
+import com.github.turbomarkwon.customcontainer.ContainerNode
+import android.widget.TextView
+import android.widget.LinearLayout
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 
 /**
  * RecyclerView适配器 - 实现分块渲染Markdown内容
@@ -46,6 +52,7 @@ class MarkdownAdapter(
         private const val TYPE_BLOCK_QUOTE = 5
         private const val TYPE_THEMATIC_BREAK = 6
         private const val TYPE_HTML_BLOCK = 7
+        private const val TYPE_CONTAINER = 8
     }
 
     override fun getItemViewType(position: Int): Int {
@@ -58,6 +65,7 @@ class MarkdownAdapter(
             is MarkdownItem.BlockQuote -> TYPE_BLOCK_QUOTE
             is MarkdownItem.ThematicBreak -> TYPE_THEMATIC_BREAK
             is MarkdownItem.HtmlBlock -> TYPE_HTML_BLOCK
+            is MarkdownItem.Container -> TYPE_CONTAINER
             else -> TYPE_PARAGRAPH
         }
     }
@@ -97,6 +105,10 @@ class MarkdownAdapter(
             TYPE_HTML_BLOCK -> {
                 val binding = ItemMarkdownParagraphBinding.inflate(layoutInflater, parent, false)
                 HtmlBlockViewHolder(binding)
+            }
+            TYPE_CONTAINER -> {
+                val binding = ItemMarkdownContainerBinding.inflate(layoutInflater, parent, false)
+                ContainerViewHolder(binding)
             }
             else -> {
                 val binding = ItemMarkdownParagraphBinding.inflate(layoutInflater, parent, false)
@@ -696,6 +708,617 @@ class MarkdownAdapter(
         override fun bind(item: MarkdownItem, markwon: Markwon) {
             if (item is MarkdownItem.HtmlBlock) {
                 MarkdownRenderer.renderNode(item.node, binding.textView, markwon)
+            }
+        }
+    }
+    
+    // 容器ViewHolder - 支持复杂内容渲染
+    class ContainerViewHolder(private val binding: ItemMarkdownContainerBinding) : BaseViewHolder(binding.root) {
+        private var currentContainerId: String? = null
+        
+        override fun bind(item: MarkdownItem, markwon: Markwon) {
+            if (item is MarkdownItem.Container) {
+                AppLog.d("ContainerViewHolder: 渲染容器 - 类型: ${item.containerType}, ID: ${item.id}")
+                
+                // 总是清除之前的内容，确保状态正确
+                binding.containerContent.removeAllViews()
+                
+                // 记录当前容器ID
+                currentContainerId = item.id
+                
+                try {
+                    // 设置容器标题和样式
+                    setupContainerHeader(item)
+                    
+                    // 分析和渲染容器内容
+                    analyzeAndRenderContent(item.node, markwon)
+                    
+                    AppLog.d("ContainerViewHolder: 容器渲染完成 - ID: ${item.id}, 子视图数量: ${binding.containerContent.childCount}")
+                    
+                } catch (e: Exception) {
+                    AppLog.e("ContainerViewHolder: 容器渲染失败", e)
+                    
+                    // 渲染失败时显示错误信息而不是空内容
+                    addErrorContentView(e.message ?: "未知错误")
+                }
+            }
+        }
+        
+        override fun onRecycled() {
+            super.onRecycled()
+            AppLog.d("ContainerViewHolder: ViewHolder 被回收，清理状态")
+            
+            // 清理状态，准备重用
+            currentContainerId = null
+            binding.containerContent.removeAllViews()
+            
+            // 重置标题
+            binding.containerTitle.text = ""
+            binding.containerHeader.background = null
+        }
+        
+        /**
+         * 设置容器标题和样式
+         */
+        private fun setupContainerHeader(item: MarkdownItem.Container) {
+            val config = ContainerNode.getConfig(item.containerType)
+            
+            if (config != null) {
+                // 设置标题
+                val title = item.title ?: config.title
+                binding.containerTitle.text = "${config.icon} $title"
+                
+                // 设置主题颜色和背景
+                try {
+                    val color = Color.parseColor(config.colorRes)
+                    setContainerHeaderBackground(color)
+                    AppLog.d("ContainerViewHolder: 设置容器标题 - 类型: ${item.containerType}, 标题: $title, 颜色: ${config.colorRes}")
+                } catch (e: Exception) {
+                    AppLog.e("ContainerViewHolder: 颜色解析失败", e)
+                    setContainerHeaderBackground(Color.parseColor("#2196F3"))
+                }
+            } else {
+                // 默认样式
+                binding.containerTitle.text = "📄 ${item.title ?: "容器"}"
+                setContainerHeaderBackground(Color.parseColor("#2196F3"))
+                AppLog.d("ContainerViewHolder: 使用默认容器样式")
+            }
+        }
+        
+        /**
+         * 设置容器标题背景，包含圆角效果
+         */
+        private fun setContainerHeaderBackground(color: Int) {
+            val drawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(color)
+                cornerRadii = floatArrayOf(
+                    12f, 12f,  // 左上角
+                    12f, 12f,  // 右上角
+                    0f, 0f,    // 右下角
+                    0f, 0f     // 左下角
+                )
+            }
+            binding.containerHeader.background = drawable
+            
+            // 确保文本颜色为白色以提供良好对比度
+            binding.containerTitle.setTextColor(Color.WHITE)
+        }
+        
+        /**
+         * 分析容器内容并创建对应的视图
+         */
+        private fun analyzeAndRenderContent(containerNode: Node, markwon: Markwon) {
+            val childNodeCount = getChildNodeCount(containerNode)
+            AppLog.d("ContainerViewHolder: 开始分析容器内容，子节点数量: $childNodeCount")
+            
+            // 如果容器真的没有子节点，直接显示空内容提示
+            if (childNodeCount == 0) {
+                AppLog.d("ContainerViewHolder: 容器确实没有子节点，显示空内容提示")
+                addEmptyContentView()
+                return
+            }
+            
+            // 调试：打印完整的容器 AST 结构
+            AppLog.d("ContainerViewHolder: ===== 容器 AST 结构 =====")
+            debugPrintContainerStructure(containerNode, "ContainerAST: ")
+            AppLog.d("ContainerViewHolder: ===========================")
+            
+            var child = containerNode.firstChild
+            var processedNodeCount = 0
+            
+            while (child != null) {
+                AppLog.d("ContainerViewHolder: 处理子节点类型: ${child.javaClass.simpleName}")
+                
+                try {
+                    when (child) {
+                        is Paragraph -> {
+                            addParagraphView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is Heading -> {
+                            addHeadingView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is FencedCodeBlock, is IndentedCodeBlock -> {
+                            addCodeBlockView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is TableBlock -> {
+                            addTableView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is BulletList, is OrderedList -> {
+                            AppLog.d("ContainerViewHolder: 找到列表节点: ${child.javaClass.simpleName}")
+                            addListView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is BlockQuote -> {
+                            addBlockQuoteView(child, markwon)
+                            processedNodeCount++
+                        }
+                        is ThematicBreak -> {
+                            addThematicBreakView(child, markwon)
+                            processedNodeCount++
+                        }
+                        else -> {
+                            // 其他类型作为段落处理
+                            AppLog.d("ContainerViewHolder: 未知节点类型作为段落处理: ${child.javaClass.simpleName}")
+                            addParagraphView(child, markwon)
+                            processedNodeCount++
+                        }
+                    }
+                } catch (e: Exception) {
+                    AppLog.e("ContainerViewHolder: 渲染子节点时出错", e)
+                    // 即使出错也要继续处理其他节点
+                }
+                
+                child = child.next
+            }
+            
+            AppLog.d("ContainerViewHolder: 容器内容分析完成，期望处理 $childNodeCount 个节点，实际处理 $processedNodeCount 个，创建了 ${binding.containerContent.childCount} 个子视图")
+            
+            // 只有在没有成功创建任何子视图时才显示空内容提示
+            if (binding.containerContent.childCount == 0) {
+                AppLog.d("ContainerViewHolder: 警告：虽然有子节点但没有成功创建任何视图，显示空内容提示")
+                addEmptyContentView()
+            }
+        }
+        
+        /**
+         * 计算子节点数量（用于调试）
+         */
+        private fun getChildNodeCount(node: Node): Int {
+            var count = 0
+            var child = node.firstChild
+            while (child != null) {
+                count++
+                child = child.next
+            }
+            return count
+        }
+        
+        /**
+         * 调试打印容器的 AST 结构
+         */
+        private fun debugPrintContainerStructure(containerNode: Node, prefix: String = "") {
+            AppLog.d("$prefix${containerNode.javaClass.simpleName}")
+            
+            var child = containerNode.firstChild
+            while (child != null) {
+                AppLog.d("$prefix  ├─ ${child.javaClass.simpleName}")
+                
+                // 如果是段落，打印其内容的前50个字符
+                if (child is Paragraph) {
+                    val content = extractTextContent(child)
+                    AppLog.d("$prefix     内容: ${content.take(50)}...")
+                } else if (child is BulletList || child is OrderedList) {
+                    // 如果是列表，打印列表项
+                    var listItem = child.firstChild
+                    var itemIndex = 1
+                    while (listItem != null) {
+                        AppLog.d("$prefix     项目$itemIndex: ${listItem.javaClass.simpleName}")
+                        if (listItem is ListItem) {
+                            val itemContent = extractTextContent(listItem)
+                            AppLog.d("$prefix        内容: ${itemContent.take(30)}...")
+                        }
+                        listItem = listItem.next
+                        itemIndex++
+                    }
+                }
+                
+                child = child.next
+            }
+        }
+        
+        /**
+         * 提取节点的文本内容
+         */
+        private fun extractTextContent(node: Node): String {
+            val content = StringBuilder()
+            
+            fun collectText(n: Node) {
+                when (n) {
+                    is Text -> content.append(n.literal)
+                    is Code -> content.append(n.literal)
+                    else -> {
+                        var child = n.firstChild
+                        while (child != null) {
+                            collectText(child)
+                            child = child.next
+                        }
+                    }
+                }
+            }
+            
+            collectText(node)
+            return content.toString().trim()
+        }
+        
+        /**
+         * 添加段落视图
+         */
+        private fun addParagraphView(node: Node, markwon: Markwon) {
+            // 检查段落内容，看是否包含列表结构
+            val nodeContent = reconstructMarkdownFromNode(node)
+            AppLog.d("ContainerViewHolder: 段落内容: ${nodeContent.take(100)}...")
+            
+            val textView = createBaseTextView()
+            
+            // 检查是否包含数学公式
+            if (containsMathFormula(nodeContent)) {
+                MarkdownUtils.renderEnhancedToTextView(textView, nodeContent)
+            } else {
+                MarkdownRenderer.renderNode(node, textView, markwon)
+            }
+            
+            // 检查渲染后的结果
+            AppLog.d("ContainerViewHolder: 段落渲染后: ${textView.text.toString().take(100)}...")
+            
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加标题视图
+         */
+        private fun addHeadingView(node: Node, markwon: Markwon) {
+            val textView = createBaseTextView()
+            MarkdownRenderer.renderNode(node, textView, markwon)
+            
+            // 根据标题级别调整样式
+            if (node is Heading) {
+                val textSize = when (node.level) {
+                    1 -> 18f
+                    2 -> 16f
+                    3 -> 15f
+                    4 -> 14f
+                    5 -> 13f
+                    6 -> 12f
+                    else -> 11f
+                }
+                textView.textSize = textSize
+                textView.setTypeface(null, android.graphics.Typeface.BOLD)
+            }
+            
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加代码块视图
+         */
+        private fun addCodeBlockView(node: Node, markwon: Markwon) {
+            val code = when (node) {
+                is FencedCodeBlock -> node.literal ?: ""
+                is IndentedCodeBlock -> node.literal ?: ""
+                else -> ""
+            }
+            
+            val language = if (node is FencedCodeBlock) node.info else null
+            
+            // 检查是否为 Mermaid 图表
+            if (language?.lowercase() == "mermaid") {
+                addMermaidView(code)
+            } else {
+                addCodeView(code, language)
+            }
+        }
+        
+        /**
+         * 添加代码视图
+         */
+        private fun addCodeView(code: String, language: String?) {
+            val codeDisplayView = CodeDisplayView(binding.root.context)
+            codeDisplayView.setCode(code, language ?: "")
+            
+            val layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 8
+                bottomMargin = 8
+            }
+            codeDisplayView.layoutParams = layoutParams
+            
+            binding.containerContent.addView(codeDisplayView)
+        }
+        
+        /**
+         * 添加 Mermaid 图表视图
+         */
+        private fun addMermaidView(mermaidContent: String) {
+            val mermaidDisplayView = MermaidDisplayView(binding.root.context)
+            mermaidDisplayView.setMermaidContent(mermaidContent) { success, error ->
+                if (!success) {
+                    AppLog.e("ContainerViewHolder: Mermaid 图表渲染失败: $error")
+                }
+            }
+            
+            val layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 8
+                bottomMargin = 8
+            }
+            mermaidDisplayView.layoutParams = layoutParams
+            
+            binding.containerContent.addView(mermaidDisplayView)
+        }
+        
+        /**
+         * 添加表格视图
+         */
+        private fun addTableView(node: Node, markwon: Markwon) {
+            // 为表格创建可滚动的容器
+            val scrollView = HorizontalScrollView(binding.root.context).apply {
+                isHorizontalScrollBarEnabled = true
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 8
+                    bottomMargin = 8
+                }
+            }
+            
+            val textView = createBaseTextView()
+            MarkdownRenderer.renderNode(node, textView, markwon)
+            
+            scrollView.addView(textView)
+            binding.containerContent.addView(scrollView)
+        }
+        
+        /**
+         * 添加列表视图
+         */
+        private fun addListView(node: Node, markwon: Markwon) {
+            AppLog.d("ContainerViewHolder: 开始渲染列表，类型: ${node.javaClass.simpleName}")
+            
+            // 检查列表的子节点
+            var listItemCount = 0
+            var listItem = node.firstChild
+            while (listItem != null) {
+                listItemCount++
+                AppLog.d("ContainerViewHolder: 列表项 $listItemCount: ${listItem.javaClass.simpleName}")
+                listItem = listItem.next
+            }
+            AppLog.d("ContainerViewHolder: 列表包含 $listItemCount 个项目")
+            
+            val textView = createBaseTextView()
+            
+            // 为列表设置特殊的样式，确保有足够的左边距
+            textView.setPadding(24, 8, 0, 8)
+            
+            MarkdownRenderer.renderNode(node, textView, markwon)
+            
+            // 检查渲染后的文本内容
+            AppLog.d("ContainerViewHolder: 列表渲染后的文本内容: ${textView.text.toString().take(100)}...")
+            
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加引用块视图
+         */
+        private fun addBlockQuoteView(node: Node, markwon: Markwon) {
+            val textView = createBaseTextView()
+            MarkdownRenderer.renderNode(node, textView, markwon)
+            
+            // 添加引用样式
+            textView.setPadding(32, 16, 0, 16)
+            textView.setBackgroundColor(0x1A000000) // 半透明背景
+            
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加分隔线视图
+         */
+        private fun addThematicBreakView(node: Node, markwon: Markwon) {
+            val textView = createBaseTextView()
+            MarkdownRenderer.renderNode(node, textView, markwon)
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加空内容提示
+         */
+        private fun addEmptyContentView() {
+            val textView = createBaseTextView()
+            textView.text = "此容器暂无内容"
+            textView.alpha = 0.6f
+            textView.gravity = android.view.Gravity.CENTER
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 添加错误内容提示
+         */
+        private fun addErrorContentView(errorMessage: String) {
+            val textView = createBaseTextView()
+            textView.text = "容器渲染出错: $errorMessage"
+            textView.alpha = 0.8f
+            textView.gravity = android.view.Gravity.CENTER
+            textView.setTextColor(Color.RED)
+            binding.containerContent.addView(textView)
+        }
+        
+        /**
+         * 创建基础文本视图
+         */
+        private fun createBaseTextView(): TextView {
+            return TextView(binding.root.context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 4
+                    bottomMargin = 4
+                }
+                textSize = 14f
+                setLineSpacing(4f, 1.2f)
+                setPadding(0, 8, 0, 8)
+            }
+        }
+        
+        /**
+         * 从节点重构 Markdown 内容
+         */
+        private fun reconstructMarkdownFromNode(node: Node): String {
+            val result = processNodeToMarkdown(node)
+            return fixLatexEscaping(result)
+        }
+        
+        /**
+         * 递归处理节点转换为 Markdown
+         */
+        private fun processNodeToMarkdown(node: Node): String {
+            val content = StringBuilder()
+            
+            when (node) {
+                is Text -> {
+                    content.append(node.literal)
+                }
+                is Code -> {
+                    content.append("`").append(node.literal).append("`")
+                }
+                is Emphasis -> {
+                    content.append("*")
+                    processChildren(node, content)
+                    content.append("*")
+                }
+                is StrongEmphasis -> {
+                    content.append("**")
+                    processChildren(node, content)
+                    content.append("**")
+                }
+                is Link -> {
+                    content.append("[")
+                    processChildren(node, content)
+                    content.append("](").append(node.destination).append(")")
+                }
+                is Image -> {
+                    content.append("![")
+                    processChildren(node, content)
+                    content.append("](").append(node.destination).append(")")
+                }
+                is HardLineBreak -> {
+                    content.append("\n")
+                }
+                is SoftLineBreak -> {
+                    content.append("\n")
+                }
+                is HtmlInline -> {
+                    content.append(node.literal)
+                }
+                is BulletList -> {
+                    // 处理无序列表
+                    content.append("\n")
+                    var listItem = node.firstChild
+                    while (listItem != null) {
+                        if (listItem is ListItem) {
+                            content.append("- ")
+                            processChildren(listItem, content)
+                            content.append("\n")
+                        }
+                        listItem = listItem.next
+                    }
+                }
+                is OrderedList -> {
+                    // 处理有序列表
+                    content.append("\n")
+                    var listItem = node.firstChild
+                    var itemNumber = 1
+                    while (listItem != null) {
+                        if (listItem is ListItem) {
+                            content.append("$itemNumber. ")
+                            processChildren(listItem, content)
+                            content.append("\n")
+                            itemNumber++
+                        }
+                        listItem = listItem.next
+                    }
+                }
+                is ListItem -> {
+                    // 列表项通常由父列表处理，这里直接处理子节点
+                    processChildren(node, content)
+                }
+                else -> {
+                    processChildren(node, content)
+                }
+            }
+            
+            return content.toString()
+        }
+        
+        /**
+         * 处理子节点
+         */
+        private fun processChildren(parentNode: Node, content: StringBuilder) {
+            var child = parentNode.firstChild
+            while (child != null) {
+                content.append(processNodeToMarkdown(child))
+                child = child.next
+            }
+        }
+        
+        /**
+         * 修复 LaTeX 转义问题
+         */
+        private fun fixLatexEscaping(content: String): String {
+            if (!content.contains("$$")) {
+                return content
+            }
+            
+            return content.replace(Regex("(\\$\\$[\\s\\S]*?\\$\\$)")) { match ->
+                val mathContent = match.value
+                mathContent.replace(Regex("\\\\\\s*\n")) { match ->
+                    "\\\\\\\\${match.value.substring(1)}"
+                }.replace(Regex("([^\\\\])\\\\(\\s*\n)")) { match ->
+                    "${match.groupValues[1]}\\\\\\\\${match.groupValues[2]}"
+                }
+            }
+        }
+        
+        /**
+         * 检查文本是否包含数学公式
+         */
+        private fun containsMathFormula(text: String): Boolean {
+            val mathPatterns = listOf(
+                "\\$\\$[\\s\\S]*?\\$\\$",
+                "\\$[^\\$\\n]*?\\$",
+                "\\\\\\([\\s\\S]*?\\\\\\)",
+                "\\\\\\[[\\s\\S]*?\\\\\\]",
+                "\\\\[a-zA-Z]+",
+                "\\\\(frac|sqrt|sum|int|lim|infty|partial|nabla|alpha|beta|gamma|delta|epsilon|theta|lambda|mu|pi|sigma|omega|begin|end|pmatrix|bmatrix|vmatrix|matrix)"
+            )
+            
+            return mathPatterns.any { pattern ->
+                try {
+                    text.contains(Regex(pattern))
+                } catch (e: Exception) {
+                    false
+                }
             }
         }
     }

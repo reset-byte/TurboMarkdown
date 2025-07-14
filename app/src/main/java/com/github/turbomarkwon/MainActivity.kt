@@ -290,7 +290,8 @@ class MainActivity : AppCompatActivity() {
             "4、图片渲染测试",
             "5、Mermaid图表测试",
             "6、自定义标签测试",
-            "7、性能统计"
+            "7、自定义容器测试",
+            "8、性能统计"
         )
         
         val dialog = AlertDialog.Builder(this)
@@ -303,7 +304,8 @@ class MainActivity : AppCompatActivity() {
                     3 -> loadTestCase(SampleMarkdown.IMAGE_RENDERING_TEST_MARKDOWN, "图片渲染测试")
                     4 -> loadTestCase(SampleMarkdown.MERMAID_TEST_MARKDOWN, "Mermaid图表测试")
                     5 -> loadTestCase(SampleMarkdown.CUSTOM_TAGS_TEST_MARKDOWN, "自定义标签测试")
-                    6 -> showPerformanceDialog()
+                    6 -> loadTestCase(SampleMarkdown.CONTAINER_TEST_MARKDOWN, "自定义容器测试")
+                    7 -> showPerformanceDialog()
                 }
             }
             .setNegativeButton("取消", null)

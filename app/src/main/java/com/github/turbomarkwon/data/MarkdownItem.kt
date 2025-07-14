@@ -62,6 +62,13 @@ sealed class MarkdownItem {
         override val id: String,
         override val node: Node
     ) : MarkdownItem()
+    
+    data class Container(
+        override val id: String,
+        override val node: Node,
+        val containerType: String,
+        val title: String?
+    ) : MarkdownItem()
 }
 
 /**
