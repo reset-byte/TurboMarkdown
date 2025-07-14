@@ -26,6 +26,7 @@ import com.github.turbomarkwon.util.MarkdownUtils
 import kotlin.math.abs
 import org.commonmark.ext.gfm.tables.TableBlock
 import org.commonmark.ext.gfm.tables.TableHead
+import org.commonmark.ext.gfm.tables.TableBody
 import org.commonmark.ext.gfm.tables.TableRow
 import org.commonmark.ext.gfm.tables.TableCell
 import org.commonmark.node.*
@@ -1066,11 +1067,48 @@ class MarkdownAdapter(
         }
         
         /**
-         * 添加表格视图
+         * 添加表格视图 - 简化版本，借鉴TableViewHolder的成功实现
          */
         private fun addTableView(node: Node, markwon: Markwon) {
-            // 为表格创建可滚动的容器
-            val scrollView = HorizontalScrollView(binding.root.context).apply {
+            AppLog.d("ContainerViewHolder: addTableView 被调用，节点类型: ${node.javaClass.simpleName}")
+            
+            try {
+                // 创建可滚动的表格容器，复用TableViewHolder的设计
+                val scrollView = createOptimizedTableScrollView()
+                val textView = createOptimizedTableTextView()
+                
+                // 直接使用现有的markwon实例渲染，避免插件冲突
+                MarkdownRenderer.renderNode(node, textView, markwon)
+                
+                // 应用TableViewHolder的智能优化逻辑
+                optimizeTableLayout(textView, node, scrollView)
+                
+                scrollView.addView(textView)
+                binding.containerContent.addView(scrollView)
+                
+                AppLog.d("ContainerViewHolder: 表格视图已成功添加，使用简化渲染方案")
+                
+            } catch (e: Exception) {
+                AppLog.e("ContainerViewHolder: 表格渲染失败", e)
+                
+                // 保留格式化文本作为最终备用方案
+                val textView = createBaseTextView()
+                val tableMarkdown = reconstructTableMarkdown(node)
+                if (tableMarkdown.isNotBlank()) {
+                    displayFormattedTable(textView, tableMarkdown)
+                } else {
+                    textView.text = "表格渲染失败: ${e.message}"
+                    textView.setTextColor(Color.RED)
+                }
+                binding.containerContent.addView(textView)
+            }
+        }
+        
+        /**
+         * 创建优化的表格滚动视图
+         */
+        private fun createOptimizedTableScrollView(): HorizontalScrollView {
+            return HorizontalScrollView(binding.root.context).apply {
                 isHorizontalScrollBarEnabled = true
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1079,14 +1117,273 @@ class MarkdownAdapter(
                     topMargin = 8
                     bottomMargin = 8
                 }
+                
+                // 复用TableViewHolder的触摸事件处理逻辑
+                setupTableScrollTouchHandler(this)
+            }
+        }
+        
+        /**
+         * 创建优化的表格文本视图
+         */
+        private fun createOptimizedTableTextView(): TextView {
+            return TextView(binding.root.context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                textSize = 14f
+                setLineSpacing(4f, 1.2f)
+                setPadding(12, 8, 12, 8)
+                
+                // 设置表格专用的移动方法（如果需要）
+                try {
+                    movementMethod = io.noties.markwon.ext.tables.TableAwareMovementMethod.create()
+                } catch (e: Exception) {
+                    AppLog.d("ContainerViewHolder: TableAwareMovementMethod不可用，使用默认方法")
+                }
+            }
+        }
+        
+        /**
+         * 设置表格滚动的触摸事件处理，复用TableViewHolder的逻辑
+         */
+        private fun setupTableScrollTouchHandler(scrollView: HorizontalScrollView) {
+            var startX = 0f
+            var startY = 0f
+            var isHorizontalScroll = false
+            
+            scrollView.setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        startX = event.x
+                        startY = event.y
+                        isHorizontalScroll = false
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaX = kotlin.math.abs(event.x - startX)
+                        val deltaY = kotlin.math.abs(event.y - startY)
+                        
+                        // 判断是否为水平滑动
+                        if (deltaX > deltaY && deltaX > 20) {
+                            if (!isHorizontalScroll) {
+                                isHorizontalScroll = true
+                                scrollView.parent?.requestDisallowInterceptTouchEvent(true)
+                            }
+                        }
+                    }
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL -> {
+                        scrollView.parent?.requestDisallowInterceptTouchEvent(false)
+                        isHorizontalScroll = false
+                    }
+                }
+                false
+            }
+        }
+        
+        /**
+         * 优化表格布局，借鉴TableViewHolder的智能优化逻辑
+         */
+        private fun optimizeTableLayout(textView: TextView, tableNode: Node, scrollView: HorizontalScrollView) {
+            val columnCount = detectTableColumnsFromNode(tableNode)
+            val context = textView.context
+            val screenWidth = context.resources.displayMetrics.widthPixels
+            
+            when {
+                columnCount <= 3 -> {
+                    // 3列及以下表格的处理
+                    val minWidth = (screenWidth * 0.8).toInt()
+                    textView.minWidth = minWidth
+                    
+                    // 延迟检查是否需要滚动条
+                    textView.post {
+                        val availableWidth = scrollView.width - scrollView.paddingLeft - scrollView.paddingRight
+                        val textViewWidth = textView.width
+                        
+                        scrollView.isHorizontalScrollBarEnabled = textViewWidth > availableWidth && availableWidth > 0
+                        
+                        AppLog.d("ContainerViewHolder: ${columnCount}列表格优化 - 需要滚动: ${scrollView.isHorizontalScrollBarEnabled}")
+                    }
+                }
+                columnCount > 3 -> {
+                    // 超过3列的表格设置更大的最小宽度
+                    val minWidth = (screenWidth * 1.2).toInt()
+                    textView.minWidth = minWidth
+                    scrollView.isHorizontalScrollBarEnabled = true
+                    AppLog.d("ContainerViewHolder: 多列表格(${columnCount}列)，启用滚动条")
+                }
+                else -> {
+                    // 检测失败时的默认处理
+                    val minWidth = (screenWidth * 0.8).toInt()
+                    textView.minWidth = minWidth
+                    AppLog.d("ContainerViewHolder: 表格列数检测失败，使用默认配置")
+                }
+            }
+        }
+        
+        /**
+         * 检测表格列数，复用TableViewHolder的检测逻辑
+         */
+        private fun detectTableColumnsFromNode(tableNode: Node): Int {
+            return try {
+                val tableBlock = tableNode as? TableBlock
+                
+                if (tableBlock != null) {
+                    val header = tableBlock.firstChild as? TableHead
+                    header?.let { h ->
+                        val headerRow = h.firstChild as? TableRow
+                        var columnCount = 0
+                        var cell = headerRow?.firstChild
+                        while (cell != null) {
+                            if (cell is TableCell) {
+                                columnCount++
+                            }
+                            cell = cell.next
+                        }
+                        columnCount
+                    } ?: 0
+                } else {
+                    0
+                }
+            } catch (e: Exception) {
+                AppLog.d("ContainerViewHolder: 表格列数检测出错: ${e.message}")
+                0
+            }
+        }
+        
+        /**
+         * 重构表格的Markdown内容
+         */
+        private fun reconstructTableMarkdown(tableNode: Node): String {
+            if (tableNode !is TableBlock) {
+                return ""
             }
             
-            val textView = createBaseTextView()
-            MarkdownRenderer.renderNode(node, textView, markwon)
+            val markdown = StringBuilder()
             
-            scrollView.addView(textView)
-            binding.containerContent.addView(scrollView)
+            try {
+                // 处理表格头部和主体
+                var child = tableNode.firstChild
+                var isFirstRow = true
+                
+                while (child != null) {
+                    when (child) {
+                        is TableHead -> {
+                            val headerRow = child.firstChild
+                            if (headerRow is TableRow) {
+                                val headerMarkdown = reconstructTableRow(headerRow)
+                                markdown.append(headerMarkdown).append("\n")
+                                
+                                // 添加分隔行
+                                val cellCount = countTableCells(headerRow)
+                                val separatorRow = (1..cellCount).joinToString(" | ") { "---" }
+                                markdown.append("| $separatorRow |\n")
+                            }
+                        }
+                        is TableBody -> {
+                            var bodyRow = child.firstChild
+                            while (bodyRow != null) {
+                                if (bodyRow is TableRow) {
+                                    val rowMarkdown = reconstructTableRow(bodyRow)
+                                    markdown.append(rowMarkdown).append("\n")
+                                }
+                                bodyRow = bodyRow.next
+                            }
+                        }
+                    }
+                    child = child.next
+                }
+                
+                return markdown.toString()
+                
+            } catch (e: Exception) {
+                AppLog.e("ContainerViewHolder: 重构表格Markdown失败", e)
+                return ""
+            }
         }
+        
+        /**
+         * 重构表格行的Markdown
+         */
+        private fun reconstructTableRow(rowNode: TableRow): String {
+            val cells = mutableListOf<String>()
+            
+            var cell = rowNode.firstChild
+            while (cell != null) {
+                if (cell is TableCell) {
+                    val cellContent = extractNodeTextContent(cell)
+                    cells.add(cellContent.trim())
+                }
+                cell = cell.next
+            }
+            
+            return "| ${cells.joinToString(" | ")} |"
+        }
+        
+        /**
+         * 计算表格行中的单元格数量
+         */
+        private fun countTableCells(rowNode: TableRow): Int {
+            var count = 0
+            var cell = rowNode.firstChild
+            while (cell != null) {
+                if (cell is TableCell) {
+                    count++
+                }
+                cell = cell.next
+            }
+            return count
+        }
+        
+        /**
+         * 提取节点的文本内容
+         */
+        private fun extractNodeTextContent(node: Node): String {
+            val content = StringBuilder()
+            
+            fun extractText(currentNode: Node) {
+                when (currentNode) {
+                    is Text -> {
+                        content.append(currentNode.literal ?: "")
+                    }
+                    is Code -> {
+                        content.append("`${currentNode.literal ?: ""}`")
+                    }
+                    is Emphasis -> {
+                        content.append("*")
+                        var child = currentNode.firstChild
+                        while (child != null) {
+                            extractText(child)
+                            child = child.next
+                        }
+                        content.append("*")
+                    }
+                    is StrongEmphasis -> {
+                        content.append("**")
+                        var child = currentNode.firstChild
+                        while (child != null) {
+                            extractText(child)
+                            child = child.next
+                        }
+                        content.append("**")
+                    }
+                    else -> {
+                        // 递归处理其他节点的子节点
+                        var child = currentNode.firstChild
+                        while (child != null) {
+                            extractText(child)
+                            child = child.next
+                        }
+                    }
+                }
+            }
+            
+            extractText(node)
+            return content.toString()
+        }
+        
+
         
         /**
          * 添加列表视图
@@ -1320,6 +1617,61 @@ class MarkdownAdapter(
                     false
                 }
             }
+        }
+        
+        /**
+         * 美化显示表格文本（备用方案）
+         */
+        private fun displayFormattedTable(textView: TextView, tableMarkdown: String) {
+            // 美化表格显示
+            textView.apply {
+                // 使用等宽字体确保对齐
+                typeface = android.graphics.Typeface.MONOSPACE
+                
+                // 稍微增大字体大小以提高可读性
+                textSize = 13f
+                
+                // 添加内边距
+                setPadding(16, 12, 16, 12)
+                
+                // 设置行间距
+                setLineSpacing(2f, 1.15f)
+                
+                // 设置轻微的背景色以突出显示
+                setBackgroundColor(Color.parseColor("#F8F9FA"))
+                
+                // 设置文本颜色
+                setTextColor(Color.parseColor("#2C3E50"))
+                
+                // 处理表格内容：清理多余的空行并格式化
+                val formattedContent = formatTableContent(tableMarkdown)
+                text = formattedContent
+            }
+            
+            AppLog.d("ContainerViewHolder: 表格已格式化显示，内容长度: ${tableMarkdown.length}")
+        }
+        
+        /**
+         * 格式化表格内容文本
+         */
+        private fun formatTableContent(tableMarkdown: String): String {
+            return tableMarkdown
+                .lines()
+                .filter { it.trim().isNotEmpty() } // 移除空行
+                .map { line ->
+                    when {
+                        line.trim().startsWith("|") && line.trim().endsWith("|") -> {
+                            // 表格行，稍微美化格式
+                            line.trim()
+                        }
+                        line.trim().contains("---") -> {
+                            // 分隔符行，使用更美观的字符
+                            line.replace("-", "─")
+                        }
+                        else -> line.trim()
+                    }
+                }
+                .joinToString("\n")
         }
     }
 }
