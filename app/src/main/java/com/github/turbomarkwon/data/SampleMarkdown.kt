@@ -8,7 +8,7 @@ object SampleMarkdown {
     /**
      * Mermaid图表专项测试数据
      */
-    val MERMAID_TEST_MARKDOWN = """
+    const val MERMAID_TEST_MARKDOWN = """
 # Mermaid 图表测试套件
 
 本文档专门用于测试各种类型的Mermaid图表渲染效果。
@@ -687,7 +687,7 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
     /**
      * 综合表格测试用例
      */
-    val COMPREHENSIVE_TABLE_TEST_MARKDOWN = """
+    const val COMPREHENSIVE_TABLE_TEST_MARKDOWN = """
 # 综合表格测试
 
 ## 混合列数测试
@@ -760,7 +760,7 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
     /**
      * 数学公式渲染测试用例
      */
-    val MATHEMATICAL_FORMULA_TEST_MARKDOWN = """
+    const val MATHEMATICAL_FORMULA_TEST_MARKDOWN = """
 # 数学公式渲染测试
 
 ## 基本数学符号测试
@@ -990,7 +990,7 @@ $$
     /**
      * 图片渲染测试用例
      */
-    val IMAGE_RENDERING_TEST_MARKDOWN = """
+    const val IMAGE_RENDERING_TEST_MARKDOWN = """
 # 图片渲染测试
 
 ## 实际应用场景测试
@@ -1157,5 +1157,105 @@ SVG 是矢量图形格式，支持无损缩放：
 ---
 
 *本测试用例包含了各种图片渲染场景，用于验证 TurboMarkdown 的图片加载和渲染能力，包括性能优化和错误处理。*
+"""
+
+    /**
+     * 自定义标签测试用例的完整 Markdown 内容
+     */
+    const val CUSTOM_TAGS_TEST_MARKDOWN = """
+# 🏷️ 自定义标签演示
+
+这是 **TurboMarkdown** 的自定义标签功能演示，基于 Markwon 4.6.2 的 HtmlPlugin 机制实现。
+
+## 📋 支持的标签类型
+
+### 🎨 样式标签 (CustomStyleTagHandler)
+
+#### 状态标签
+- <warn>警告信息</warn> - 橙色警告样式
+- <info>信息提示</info> - 蓝色信息样式  
+- <success>成功消息</success> - 绿色成功样式
+- <error>错误信息</error> - 红色错误样式
+- <danger>危险警告</danger> - 红色危险样式
+
+#### 强调标签
+- <highlight>高亮文本</highlight> - 黄色背景高亮
+- <mark>标记文本</mark> - 黄色背景标记
+
+#### 尺寸标签
+- 正常大小文本 <small>小号文本</small> 正常大小文本
+- 正常大小文本 <large>大号文本</large> 正常大小文本
+
+#### 主题标签
+- <primary>主色调文本</primary> - 蓝色主题样式
+- <secondary>次要文本</secondary> - 灰色次要样式
+
+### ✨ 装饰标签 (CustomTextDecorationTagHandler)
+
+#### 装饰效果
+- <u>下划线文本</u> - 添加下划线
+- <s>删除线文本</s> - 添加删除线  
+- H<sub>2</sub>O - 下标效果
+- E=mc<sup>2</sup> - 上标效果
+
+## 🔄 嵌套使用示例
+
+### 标签嵌套
+<warn>这是一个 <u>带下划线</u> 的警告信息</warn>
+
+<success>成功消息中的 <small>小号文本</small> 和 <large>大号文本</large></success>
+
+<info>信息中包含 <highlight>高亮文本</highlight> 和 <mark>标记文本</mark></info>
+
+### 与 Markdown 语法混合
+<primary>**粗体主色调文本**</primary>
+
+<secondary>*斜体次要文本*</secondary>
+
+<error>`代码样式的错误信息`</error>
+
+## 📊 技术实现
+
+### 实现原理
+1. **继承 TagHandler**：实现 Markwon 的 TagHandler 接口
+2. **支持的标签**：通过 `supportedTags()` 方法声明
+3. **样式处理**：在 `handle()` 方法中应用相应的 Span
+4. **插件注册**：通过 HtmlPlugin 注册到 Markwon 实例
+
+### 支持的所有标签
+**样式标签**：`warn`, `info`, `success`, `error`, `danger`, `highlight`, `mark`, `small`, `large`, `primary`, `secondary`
+
+**装饰标签**：`u`, `s`, `sub`, `sup`
+
+### 使用方法
+```kotlin
+// 创建带有自定义标签支持的 Markwon 实例
+val markwon = Markwon.builder(context)
+    .usePlugin(CustomTagPlugin.create())
+    .build()
+
+// 渲染包含自定义标签的 Markdown
+val markdown = "<warn>这是警告信息</warn>"
+markwon.setMarkdown(textView, markdown)
+```
+
+## 🧪 测试用例
+
+### 基础功能测试
+<warn>警告</warn> <info>信息</info> <success>成功</success> <error>错误</error>
+
+### 样式组合测试  
+<primary><large>大号主色调</large></primary> <secondary><small>小号次要文本</small></secondary>
+
+### 复杂嵌套测试
+<highlight>高亮文本中的 <u>下划线</u> 和 <s>删除线</s></highlight>
+
+### 科学公式测试
+水的化学式：H<sub>2</sub>O  
+爱因斯坦质能方程：E=mc<sup>2</sup>
+
+---
+
+*本演示展示了 TurboMarkdown 自定义标签的所有功能，包括样式应用、嵌套使用和与标准 Markdown 语法的兼容性。*
 """
 } 

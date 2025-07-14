@@ -1,7 +1,6 @@
 package com.github.turbomarkwon
 
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -290,7 +289,8 @@ class MainActivity : AppCompatActivity() {
             "3、数学公式测试",
             "4、图片渲染测试",
             "5、Mermaid图表测试",
-            "6、性能统计"
+            "6、自定义标签测试",
+            "7、性能统计"
         )
         
         val dialog = AlertDialog.Builder(this)
@@ -302,7 +302,8 @@ class MainActivity : AppCompatActivity() {
                     2 -> loadTestCase(SampleMarkdown.MATHEMATICAL_FORMULA_TEST_MARKDOWN, "数学公式测试")
                     3 -> loadTestCase(SampleMarkdown.IMAGE_RENDERING_TEST_MARKDOWN, "图片渲染测试")
                     4 -> loadTestCase(SampleMarkdown.MERMAID_TEST_MARKDOWN, "Mermaid图表测试")
-                    5 -> showPerformanceDialog()
+                    5 -> loadTestCase(SampleMarkdown.CUSTOM_TAGS_TEST_MARKDOWN, "自定义标签测试")
+                    6 -> showPerformanceDialog()
                 }
             }
             .setNegativeButton("取消", null)
