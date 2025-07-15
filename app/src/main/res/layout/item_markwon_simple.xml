@@ -4,20 +4,22 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:paddingHorizontal="16dp"
+    android:paddingBottom="8dp">
 
     <TextView
-        android:id="@+id/textView"
+        android:id="@+id/text"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textColor="?android:textColorPrimary"
         android:textSize="16sp"
         android:lineSpacingExtra="4dp"
         android:fontFamily="sans-serif"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="• This is a list item with some content" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:text="This is a sample markdown content rendered by Markwon official adapter." />
 
 </androidx.constraintlayout.widget.ConstraintLayout> 

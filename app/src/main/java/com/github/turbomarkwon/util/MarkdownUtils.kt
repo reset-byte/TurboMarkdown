@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.widget.TextView
 import com.github.turbomarkwon.customcontainer.ContainerPlugin
 import com.github.turbomarkwon.customtag.CustomTagPlugin
+import io.noties.markwon.AbstractMarkwonPlugin
 import io.noties.markwon.Markwon
 import io.noties.markwon.SoftBreakAddsNewLinePlugin
 import io.noties.markwon.ext.latex.JLatexMathPlugin
@@ -135,6 +136,12 @@ object MarkdownUtils {
         val linkifyPlugin = LinkifyPlugin.create()
         
         val builder = Markwon.builder(context.applicationContext)
+            // 配置 CommonMark 解析器以支持 GFM 表格
+            .usePlugin(object : AbstractMarkwonPlugin() {
+                override fun configureParser(builder: org.commonmark.parser.Parser.Builder) {
+                    builder.extensions(listOf(org.commonmark.ext.gfm.tables.TablesExtension.create()))
+                }
+            })
             .usePlugin(inlineParserPlugin)
             .usePlugin(latexPlugin)
             .usePlugin(softBreakPlugin)

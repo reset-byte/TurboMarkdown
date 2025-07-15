@@ -167,6 +167,34 @@ object MermaidRenderCache {
     }
     
     /**
+     * 修整缓存 - 清理部分缓存以释放内存
+     */
+    fun trimCache() {
+        val beforeStateSize = renderStateCache.size
+        val beforeContentSize = renderContentCache.size()
+        
+        // 清理部分状态缓存，保留最重要的
+        renderContentCache.trimToSize(renderContentCache.maxSize() / 3)
+        
+        // 清理一些错误状态的缓存
+        val errorKeys = renderStateCache.entries
+            .filter { it.value == MermaidRenderState.ERROR }
+            .map { it.key }
+            .take(renderStateCache.size / 2)
+        
+        errorKeys.forEach { key ->
+            renderStateCache.remove(key)
+        }
+        
+        val afterStateSize = renderStateCache.size
+        val afterContentSize = renderContentCache.size()
+        
+        AppLog.d("MermaidRenderCache: Trim cache - " +
+                "states: $beforeStateSize -> $afterStateSize, " +
+                "content: $beforeContentSize -> $afterContentSize")
+    }
+    
+    /**
      * 获取缓存统计信息
      */
     fun getCacheStats(): Map<String, Any> {

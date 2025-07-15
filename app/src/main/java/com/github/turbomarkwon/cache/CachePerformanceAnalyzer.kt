@@ -1,83 +1,236 @@
 package com.github.turbomarkwon.cache
 
 import com.github.turbomarkwon.util.AppLog
-import kotlin.system.measureTimeMillis
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 缓存性能分析器
- * 用于监控和分析缓存系统的性能影响
+ * 缓存性能分析器 - 监控和优化缓存效果
  */
 object CachePerformanceAnalyzer {
+
+    // Entry 缓存统计
+    private val entryCacheStats = ConcurrentHashMap<String, EntryCacheStats>()
     
-    private var totalParseTime: Long = 0
-    private var totalRenderTime: Long = 0
-    private var parseOperations: Int = 0
-    private var renderOperations: Int = 0
-    private var memorySnapshots = mutableListOf<MemorySnapshot>()
+    // 全局计数器
+    private val totalRenderCount = AtomicLong(0)
+    private val totalCacheHitCount = AtomicLong(0)
+    private val totalRenderTimeMs = AtomicLong(0)
     
-    /**
-     * 内存快照
-     */
-    data class MemorySnapshot(
-        val timestamp: Long,
-        val totalMemory: Long,
-        val freeMemory: Long,
-        val usedMemory: Long,
-        val cacheSize: Int,
-        val cacheMemoryEstimate: Long
-    )
+    // 内存监控
+    private var lastMemoryCheck = 0L
+    private const val memoryCheckInterval = 5000L // 5秒检查一次
     
     /**
-     * 性能报告
+     * Entry缓存统计信息
      */
-    data class PerformanceReport(
-        val avgParseTime: Long,
-        val avgRenderTime: Long,
-        val totalOperations: Int,
-        val memoryEfficiency: Float,
-        val cacheEffectiveness: Float,
-        val recommendations: List<String>
-    )
-    
-    /**
-     * 测量解析性能
-     */
-    fun <T> measureParseTime(operation: () -> T): T {
-        val result: T
-        val time = measureTimeMillis {
-            result = operation()
-        }
-        
-        totalParseTime += time
-        parseOperations++
-        
-        AppLog.d("Parse time: ${time}ms")
-        return result
+    data class EntryCacheStats(
+        val entryType: String,
+        val hitCount: AtomicInteger = AtomicInteger(0),
+        val missCount: AtomicInteger = AtomicInteger(0),
+        val totalRenderTimeMs: AtomicLong = AtomicLong(0),
+        val cacheSize: AtomicInteger = AtomicInteger(0)
+    ) {
+        val hitRate: Double
+            get() {
+                val total = hitCount.get() + missCount.get()
+                return if (total > 0) (hitCount.get().toDouble() / total) * 100 else 0.0
+            }
+            
+        val averageRenderTime: Double
+            get() {
+                val total = hitCount.get() + missCount.get()
+                return if (total > 0) totalRenderTimeMs.get().toDouble() / total else 0.0
+            }
     }
     
     /**
-     * 记录解析时间（用于suspend函数）
+     * 记录缓存命中
+     */
+    fun recordCacheHit(entryType: String) {
+        val stats = entryCacheStats.getOrPut(entryType) { EntryCacheStats(entryType) }
+        stats.hitCount.incrementAndGet()
+        totalCacheHitCount.incrementAndGet()
+        
+        AppLog.d("CachePerformanceAnalyzer: $entryType 缓存命中，命中率: ${stats.hitRate.toInt()}%")
+    }
+    
+    /**
+     * 记录缓存未命中
+     */
+    fun recordCacheMiss(entryType: String, renderTimeMs: Long = 0) {
+        val stats = entryCacheStats.getOrPut(entryType) { EntryCacheStats(entryType) }
+        stats.missCount.incrementAndGet()
+        stats.totalRenderTimeMs.addAndGet(renderTimeMs)
+        totalRenderCount.incrementAndGet()
+        totalRenderTimeMs.addAndGet(renderTimeMs)
+        
+        AppLog.d("CachePerformanceAnalyzer: $entryType 缓存未命中，渲染耗时: ${renderTimeMs}ms")
+    }
+    
+    /**
+     * 更新缓存大小
+     */
+    fun updateCacheSize(entryType: String, size: Int) {
+        val stats = entryCacheStats.getOrPut(entryType) { EntryCacheStats(entryType) }
+        stats.cacheSize.set(size)
+    }
+    
+    /**
+     * 生成性能报告
+     */
+    fun generatePerformanceReport(): String {
+        val report = StringBuilder()
+        report.append("=== Entry缓存性能报告 ===\n")
+        report.append("总渲染次数: ${totalRenderCount.get()}\n")
+        report.append("总缓存命中次数: ${totalCacheHitCount.get()}\n")
+        
+        val globalHitRate = if (totalRenderCount.get() > 0) {
+            (totalCacheHitCount.get().toDouble() / (totalRenderCount.get() + totalCacheHitCount.get())) * 100
+        } else 0.0
+        report.append("全局缓存命中率: ${globalHitRate.toInt()}%\n")
+        
+        val averageRenderTime = if (totalRenderCount.get() > 0) {
+            totalRenderTimeMs.get().toDouble() / totalRenderCount.get()
+        } else 0.0
+        report.append("平均渲染时间: ${averageRenderTime.toInt()}ms\n\n")
+        
+        entryCacheStats.values.forEach { stats ->
+            report.append("--- ${stats.entryType} ---\n")
+            report.append("命中率: ${stats.hitRate.toInt()}%\n")
+            report.append("命中次数: ${stats.hitCount.get()}\n")
+            report.append("未命中次数: ${stats.missCount.get()}\n")
+            report.append("缓存大小: ${stats.cacheSize.get()}\n")
+            report.append("平均渲染时间: ${stats.averageRenderTime.toInt()}ms\n\n")
+        }
+        
+        return report.toString()
+    }
+    
+    /**
+     * 处理低内存情况
+     */
+    fun handleLowMemory() {
+        AppLog.d("CachePerformanceAnalyzer: 处理低内存情况")
+        
+        // 记录当前状态
+        logPerformanceDetails()
+        
+        // 智能缓存清理
+        performSmartCacheCleanup()
+        
+        // 清理语法高亮缓存
+        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+        
+        // 清理 Mermaid 渲染缓存
+        MermaidRenderCache.smartCleanup()
+        
+        AppLog.d("CachePerformanceAnalyzer: 低内存清理完成")
+    }
+    
+    /**
+     * 修整缓存
+     */
+    fun trimCaches() {
+        AppLog.d("CachePerformanceAnalyzer: 执行缓存修整")
+        
+        // 清理低命中率的缓存
+        performSmartCacheCleanup()
+        
+        // 部分清理其他缓存
+        MermaidRenderCache.trimCache()
+    }
+    
+    /**
+     * 清除所有统计数据
+     */
+    fun clearAll() {
+        entryCacheStats.clear()
+        totalRenderCount.set(0)
+        totalCacheHitCount.set(0)
+        totalRenderTimeMs.set(0)
+        
+        // 清理所有缓存
+        MermaidRenderCache.clearAll()
+        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+        
+        AppLog.d("CachePerformanceAnalyzer: 已清除所有缓存和统计数据")
+    }
+    
+    /**
+     * 智能缓存清理 - 清理低效的缓存
+     */
+    private fun performSmartCacheCleanup() {
+        AppLog.d("CachePerformanceAnalyzer: 开始智能缓存清理")
+        
+        entryCacheStats.values.forEach { stats ->
+            // 如果命中率低于30%，建议清理
+            if (stats.hitRate < 30.0 && stats.cacheSize.get() > 10) {
+                AppLog.d("CachePerformanceAnalyzer: ${stats.entryType} 缓存命中率过低(${stats.hitRate.toInt()}%)，建议清理")
+            }
+            
+            // 如果缓存过大，建议清理
+            if (stats.cacheSize.get() > 100) {
+                AppLog.d("CachePerformanceAnalyzer: ${stats.entryType} 缓存过大(${stats.cacheSize.get()})，建议清理")
+            }
+                 }
+    }
+    
+    /**
+     * 记录性能详情
+     */
+    fun logPerformanceDetails() {
+        val report = generatePerformanceReport()
+        AppLog.d("CachePerformanceAnalyzer Performance Report:\n$report")
+        
+        // 检查内存使用
+        checkMemoryUsage()
+    }
+    
+    /**
+     * 检查内存使用
+     */
+    private fun checkMemoryUsage() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastMemoryCheck < memoryCheckInterval) {
+            return
+        }
+        lastMemoryCheck = currentTime
+        
+        val runtime = Runtime.getRuntime()
+        val totalMemory = runtime.totalMemory()
+        val freeMemory = runtime.freeMemory()
+        val usedMemory = totalMemory - freeMemory
+        val maxMemory = runtime.maxMemory()
+        
+        val memoryUsagePercent = (usedMemory.toDouble() / maxMemory) * 100
+        
+        AppLog.d("CachePerformanceAnalyzer: 内存使用率: ${memoryUsagePercent.toInt()}%")
+        AppLog.d("CachePerformanceAnalyzer: 已用内存: ${usedMemory / 1024 / 1024}MB")
+        AppLog.d("CachePerformanceAnalyzer: 最大内存: ${maxMemory / 1024 / 1024}MB")
+        
+        // 如果内存使用率超过80%，触发智能清理
+        if (memoryUsagePercent > 80) {
+            AppLog.d("CachePerformanceAnalyzer: 内存使用率过高(${memoryUsagePercent.toInt()}%)，触发智能清理")
+            performSmartCacheCleanup()
+        }
+    }
+    
+    // 保留原有的其他方法以确保兼容性
+    
+    private var lastParseTime = 0L
+    private var parseTimeSum = 0L
+    private var parseCount = 0
+    private var lastMemorySnapshot = 0L
+    
+    /**
+     * 记录解析时间
      */
     fun recordParseTime(timeMs: Long) {
-        totalParseTime += timeMs
-        parseOperations++
-        AppLog.d("Parse time: ${timeMs}ms")
-    }
-    
-    /**
-     * 测量渲染性能
-     */
-    fun <T> measureRenderTime(operation: () -> T): T {
-        val result: T
-        val time = measureTimeMillis {
-            result = operation()
-        }
-        
-        totalRenderTime += time
-        renderOperations++
-        
-        AppLog.d("Render time: ${time}ms")
-        return result
+        lastParseTime = timeMs
+        parseTimeSum += timeMs
+        parseCount++
     }
     
     /**
@@ -85,189 +238,22 @@ object CachePerformanceAnalyzer {
      */
     fun takeMemorySnapshot() {
         val runtime = Runtime.getRuntime()
-        val totalMemory = runtime.totalMemory()
-        val freeMemory = runtime.freeMemory()
-        val usedMemory = totalMemory - freeMemory
-        
-        val lightweightCacheStats = LightweightMarkdownCache.getCacheStats()
-        
-        val snapshot = MemorySnapshot(
-            timestamp = System.currentTimeMillis(),
-            totalMemory = totalMemory,
-            freeMemory = freeMemory,
-            usedMemory = usedMemory,
-            cacheSize = lightweightCacheStats.cacheSize,
-            cacheMemoryEstimate = lightweightCacheStats.memoryEstimate
+        lastMemorySnapshot = runtime.totalMemory() - runtime.freeMemory()
+    }
+    
+    /**
+     * 获取缓存统计信息
+     */
+    fun getCacheStats(): Map<String, Any> {
+        return mapOf(
+            "totalRenderCount" to totalRenderCount.get(),
+            "totalCacheHitCount" to totalCacheHitCount.get(),
+            "globalHitRate" to if (totalRenderCount.get() > 0) {
+                (totalCacheHitCount.get().toDouble() / (totalRenderCount.get() + totalCacheHitCount.get())) * 100
+            } else 0.0,
+            "averageParseTime" to if (parseCount > 0) parseTimeSum / parseCount else 0L,
+            "lastMemoryUsage" to lastMemorySnapshot / 1024 / 1024, // MB
+            "entryCacheCount" to entryCacheStats.size
         )
-        
-        memorySnapshots.add(snapshot)
-        
-        // 只保留最近的10个快照
-        if (memorySnapshots.size > 10) {
-            memorySnapshots.removeAt(0)
-        }
-        
-        AppLog.d("Memory snapshot: Used=${usedMemory/1024/1024}MB, Cache=${snapshot.cacheSize}")
-    }
-    
-    /**
-     * 生成性能报告
-     */
-    fun generateReport(): PerformanceReport {
-        val avgParseTime = if (parseOperations > 0) totalParseTime / parseOperations else 0
-        val avgRenderTime = if (renderOperations > 0) totalRenderTime / renderOperations else 0
-        
-        val lightweightCacheStats = LightweightMarkdownCache.getCacheStats()
-        
-        // 计算内存效率
-        val memoryEfficiency = if (memorySnapshots.isNotEmpty()) {
-            val latestSnapshot = memorySnapshots.last()
-            val cacheMemoryRatio = latestSnapshot.cacheMemoryEstimate.toFloat() / latestSnapshot.usedMemory.toFloat()
-            (1.0f - cacheMemoryRatio) * 100f
-        } else {
-            0f
-        }
-        
-        // 计算缓存效果（只使用轻量级缓存）
-        val cacheEffectiveness = lightweightCacheStats.hitRate
-        
-        // 生成建议
-        val recommendations = generateRecommendations(
-            avgParseTime,
-            avgRenderTime,
-            memoryEfficiency,
-            cacheEffectiveness,
-            lightweightCacheStats
-        )
-        
-        return PerformanceReport(
-            avgParseTime = avgParseTime,
-            avgRenderTime = avgRenderTime,
-            totalOperations = parseOperations + renderOperations,
-            memoryEfficiency = memoryEfficiency,
-            cacheEffectiveness = cacheEffectiveness,
-            recommendations = recommendations
-        )
-    }
-    
-    /**
-     * 生成优化建议
-     */
-    private fun generateRecommendations(
-        avgParseTime: Long,
-        avgRenderTime: Long,
-        memoryEfficiency: Float,
-        cacheEffectiveness: Float,
-        lightweightCacheStats: LightweightMarkdownCache.CacheStats
-    ): List<String> {
-        val recommendations = mutableListOf<String>()
-        
-        // 解析性能建议
-        if (avgParseTime > 100) {
-            recommendations.add("解析时间较长(${avgParseTime}ms)，建议优化解析逻辑或使用更多缓存")
-        }
-        
-        // 渲染性能建议
-        if (avgRenderTime > 50) {
-            recommendations.add("渲染时间较长(${avgRenderTime}ms)，建议优化渲染逻辑")
-        }
-        
-        // 内存效率建议
-        if (memoryEfficiency < 70) {
-            recommendations.add("内存效率较低(${String.format("%.1f", memoryEfficiency)}%)，建议清理缓存或减少缓存大小")
-        }
-        
-        // 缓存效果建议
-        if (cacheEffectiveness < 60) {
-            recommendations.add("缓存命中率较低(${String.format("%.1f", cacheEffectiveness)}%)，建议调整缓存策略")
-        }
-        
-        // 缓存大小建议
-        if (lightweightCacheStats.cacheSize > 50) {
-            recommendations.add("缓存过大(${lightweightCacheStats.cacheSize}项)，建议减少缓存大小或增加清理频率")
-        }
-        
-        // 内存使用建议
-        if (lightweightCacheStats.memoryEstimate > 10 * 1024 * 1024) { // 10MB
-            recommendations.add("缓存内存占用过高(${lightweightCacheStats.memoryEstimate/1024/1024}MB)，建议清理缓存")
-        }
-        
-        if (recommendations.isEmpty()) {
-            recommendations.add("性能良好，无需特别优化")
-        }
-        
-        return recommendations
-    }
-    
-    /**
-     * 重置统计信息
-     */
-    fun reset() {
-        totalParseTime = 0
-        totalRenderTime = 0
-        parseOperations = 0
-        renderOperations = 0
-        memorySnapshots.clear()
-    }
-    
-    /**
-     * 输出详细的性能日志
-     */
-    fun logPerformanceDetails() {
-        val report = generateReport()
-        
-        AppLog.d("""
-            📊 缓存性能分析报告:
-            ============================
-            平均解析时间: ${report.avgParseTime}ms
-            平均渲染时间: ${report.avgRenderTime}ms
-            总操作次数: ${report.totalOperations}
-            内存效率: ${String.format("%.1f", report.memoryEfficiency)}%
-            缓存效果: ${String.format("%.1f", report.cacheEffectiveness)}%
-            
-            📝 优化建议:
-            ${report.recommendations.joinToString("\n") { "• $it" }}
-            
-            📈 缓存统计:
-            轻量级缓存: ${LightweightMarkdownCache.getCacheStats()}
-            
-            💾 内存快照:
-            ${memorySnapshots.takeLast(3).joinToString("\n") { 
-                "时间: ${it.timestamp}, 已用: ${it.usedMemory/1024/1024}MB, 缓存: ${it.cacheSize}项"
-            }}
-        """.trimIndent())
-    }
-    
-    /**
-     * 检查是否需要清理缓存
-     */
-    fun checkCacheCleanupNeeded(): Boolean {
-        val runtime = Runtime.getRuntime()
-        val usedMemory = runtime.totalMemory() - runtime.freeMemory()
-        val memoryUsagePercent = (usedMemory.toFloat() / runtime.maxMemory().toFloat()) * 100f
-        
-        return memoryUsagePercent > 80f // 内存使用超过80%时建议清理
-    }
-    
-    /**
-     * 执行智能缓存清理
-     */
-    fun performSmartCacheCleanup() {
-        if (checkCacheCleanupNeeded()) {
-            // 获取缓存统计信息
-            val lightweightStats = LightweightMarkdownCache.getCacheStats()
-            
-            // 清理命中率低的缓存
-            if (lightweightStats.hitRate < 30f) {
-                LightweightMarkdownCache.clearAll()
-                AppLog.d("已清理轻量级缓存（命中率低: ${lightweightStats.hitRate}%）")
-            }
-            // 清理过大的缓存
-            else if (lightweightStats.cacheSize > 30) {
-                // 执行部分清理
-                LightweightMarkdownCache.clearAll()
-                AppLog.d("已清理轻量级缓存（大小过大: ${lightweightStats.cacheSize}项）")
-            }
-        }
     }
 } 

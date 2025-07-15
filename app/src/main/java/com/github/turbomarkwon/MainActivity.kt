@@ -6,19 +6,25 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.github.turbomarkwon.adapter.MarkdownAdapter
 import com.github.turbomarkwon.util.MarkdownUtils
-import com.github.turbomarkwon.data.MarkdownRenderState
+import com.github.turbomarkwon.viewmodel.MarkdownViewModel
 import com.github.turbomarkwon.data.SampleMarkdown
 import com.github.turbomarkwon.databinding.ActivityMainBinding
 import com.github.turbomarkwon.databinding.DialogPerformanceStatsBinding
-import com.github.turbomarkwon.viewmodel.MarkdownViewModel
 import com.github.turbomarkwon.util.AppLog
 import com.github.turbomarkwon.util.RecyclerViewPerformanceMonitor
 import com.google.android.material.snackbar.Snackbar
 import io.noties.markwon.Markwon
 import androidx.recyclerview.widget.RecyclerView
 import com.github.turbomarkwon.cache.MermaidRenderCache
+import io.noties.markwon.recycler.MarkwonAdapter
+import com.github.turbomarkwon.adapter.MarkwonMultiTypeAdapter
+import com.github.turbomarkwon.cache.CachePerformanceAnalyzer
+import android.content.ComponentCallbacks2.TRIM_MEMORY_MODERATE
+import android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+import android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
+import android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
+import android.widget.Toast
 
 /**
  * 主Activity - 展示高性能Markdown渲染
@@ -27,7 +33,7 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityMainBinding
     private lateinit var markwon: Markwon
-    private lateinit var adapter: MarkdownAdapter
+    private lateinit var adapter: MarkwonAdapter
     private val viewModel: MarkdownViewModel by viewModels()
     private var startupTime: Long = 0
     
@@ -60,25 +66,25 @@ class MainActivity : AppCompatActivity() {
      * 设置RecyclerView
      */
     private fun setupRecyclerView() {
-        adapter = MarkdownAdapter(markwon)
+        // 使用多类型的 Markwon 官方适配器
+        adapter = MarkwonMultiTypeAdapter.create()
         
         binding.recyclerView.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = this@MainActivity.adapter
             setHasFixedSize(false)
             
-            // 针对 Mermaid 图表优化的性能配置
-            setItemViewCacheSize(30)  // 增加缓存大小，特别针对代码块
+            // 针对多类型适配器的性能优化配置
+            setItemViewCacheSize(30)  // 增加缓存大小
             
-            // 优化 ViewHolder 回收池 - 针对不同类型设置合适的缓存数量
-            recycledViewPool.setMaxRecycledViews(0, 12)  // 段落类型 (TYPE_PARAGRAPH)
-            recycledViewPool.setMaxRecycledViews(1, 6)   // 标题类型 (TYPE_HEADING)
-            recycledViewPool.setMaxRecycledViews(2, 13)   // 代码块类型 (TYPE_CODE_BLOCK) - 增加缓存
-            recycledViewPool.setMaxRecycledViews(3, 10)  // 列表项类型 (TYPE_LIST_ITEM)
-            recycledViewPool.setMaxRecycledViews(4, 4)   // 表格类型 (TYPE_TABLE)
-            recycledViewPool.setMaxRecycledViews(5, 3)   // 引用块类型 (TYPE_BLOCK_QUOTE)
-            recycledViewPool.setMaxRecycledViews(6, 2)   // 分隔线类型 (TYPE_THEMATIC_BREAK)
-            recycledViewPool.setMaxRecycledViews(7, 2)   // HTML块类型 (TYPE_HTML_BLOCK)
+            // 优化 ViewHolder 回收池 - 为不同类型配置合适的缓存数量
+            recycledViewPool.setMaxRecycledViews(0, 15)  // 智能段落类型（包括数学公式）
+            // 多类型适配器会自动管理不同的 ViewType ID
+            recycledViewPool.setMaxRecycledViews(1, 8)   // 标题类型
+            recycledViewPool.setMaxRecycledViews(2, 10)  // 代码块类型  
+            recycledViewPool.setMaxRecycledViews(3, 5)   // 表格类型
+            recycledViewPool.setMaxRecycledViews(4, 5)   // 引用块类型
+            recycledViewPool.setMaxRecycledViews(5, 6)   // 自定义容器类型
             
             // 设置滚动优化
             isNestedScrollingEnabled = true
@@ -100,6 +106,23 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+                
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    
+                    // 智能预加载：预测用户滚动方向并预加载即将显示的内容
+                    if (dy > 0) { // 向下滚动
+                        val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+                        val totalItemCount = layoutManager.itemCount
+                        
+                        // 当接近底部时，预加载下面的内容
+                        if (lastVisiblePosition >= totalItemCount - 3 && totalItemCount > 0) {
+                            MarkwonMultiTypeAdapter.preloadUpcomingContent(lastVisiblePosition + 1, 3)
+                            AppLog.d("MainActivity: 触发向下滚动预加载，位置: ${lastVisiblePosition + 1}")
+                        }
+                    }
+                }
             })
         }
     }
@@ -108,10 +131,28 @@ class MainActivity : AppCompatActivity() {
      * 设置ViewModel观察者
      */
     private fun setupViewModel() {
-        // 观察Markdown项目列表
-        viewModel.markdownItems.observe(this) { items ->
-            adapter.submitList(items)
-            AppLog.d("Loaded ${items.size} markdown items")
+        // 观察Markdown渲染状态，使用原始文本进行渲染
+        viewModel.markdownText.observe(this) { markdownText ->
+            if (markdownText.isNotEmpty()) {
+                AppLog.d("MainActivity: 收到新的Markdown内容，长度: ${markdownText.length}")
+                AppLog.d("MainActivity: 内容预览: ${markdownText.take(200)}")
+                
+                adapter.setMarkdown(markwon, markdownText)
+                AppLog.d("MainActivity: 已调用adapter.setMarkdown()更新适配器")
+                
+                // 启用智能预加载
+                MarkwonMultiTypeAdapter.enableIntelligentPreloading(adapter, markwon, markdownText)
+                AppLog.d("MainActivity: 智能预加载已启用")
+                
+                // 强制刷新RecyclerView
+                binding.recyclerView.post {
+                    adapter.notifyDataSetChanged()
+                    AppLog.d("MainActivity: 适配器项目数量: ${adapter.itemCount}")
+                    AppLog.d("MainActivity: 强制刷新RecyclerView完成")
+                }
+            } else {
+                AppLog.d("MainActivity: 收到空的Markdown内容，跳过更新")
+            }
         }
         
         // 观察加载状态
@@ -133,21 +174,20 @@ class MainActivity : AppCompatActivity() {
         // 观察渲染状态
         viewModel.renderState.observe(this) { state ->
             when (state) {
-                is MarkdownRenderState.Loading -> {
+                is MarkdownViewModel.MarkdownRenderState.Loading -> {
                     AppLog.d("Loading markdown...")
                 }
-                is MarkdownRenderState.Success -> {
-                    val result = state.result
-                    AppLog.d("Parse completed in ${result.parseTimeMs}ms")
-                    AppLog.d("Total items: ${result.itemCount}")
+                is MarkdownViewModel.MarkdownRenderState.Success -> {
+                    AppLog.d("Markdown rendered successfully in ${state.loadTimeMs}ms")
+                    AppLog.d("Content processed with multi-type Markwon adapter (${state.contentLength} chars)")
                     
                     // 记录启动时间
                     val currentTime = System.currentTimeMillis()
                     val totalStartupTime = currentTime - startupTime
                     viewModel.setStartupTime(totalStartupTime)
                 }
-                is MarkdownRenderState.Error -> {
-                    AppLog.e("Parse error", state.exception)
+                is MarkdownViewModel.MarkdownRenderState.Error -> {
+                    AppLog.e("Markdown render error", state.exception)
                 }
             }
         }
@@ -169,6 +209,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupFab() {
         binding.fabStats.setOnClickListener {
             showPerformanceDialog()
+        }
+        
+        // 长按显示缓存性能报告
+        binding.fabStats.setOnLongClickListener {
+            showCachePerformanceInfo()
+            true
         }
         
         // 长按显示测试选项
@@ -328,13 +374,18 @@ class MainActivity : AppCompatActivity() {
      * 加载指定的测试用例
      */
     private fun loadTestCase(markdown: String, caseName: String) {
-        AppLog.d("Loading test case: $caseName")
-        Snackbar.make(binding.root, "加载测试用例: $caseName", Snackbar.LENGTH_SHORT).show()
+        AppLog.d("MainActivity: 开始加载测试用例: $caseName")
+        AppLog.d("MainActivity: 测试用例内容长度: ${markdown.length}")
+        AppLog.d("MainActivity: 内容预览: ${markdown.take(200)}")
+        
+        Snackbar.make(binding.root, "使用多类型官方适配器: $caseName", Snackbar.LENGTH_SHORT).show()
         
         // 重置启动时间以测量新的加载时间
         startupTime = System.currentTimeMillis()
         
+        AppLog.d("MainActivity: 调用viewModel.loadMarkdown()")
         viewModel.loadMarkdown(markdown)
+        AppLog.d("MainActivity: viewModel.loadMarkdown()调用完成")
     }
     
     /**
@@ -397,6 +448,41 @@ class MainActivity : AppCompatActivity() {
     }
     
     /**
+     * 显示缓存性能信息
+     */
+    private fun showCachePerformanceInfo() {
+        val report = CachePerformanceAnalyzer.generatePerformanceReport()
+        val cacheStats = CachePerformanceAnalyzer.getCacheStats()
+        
+        val fullReport = """
+            ${report}
+            
+            === 全局统计 ===
+            总渲染次数: ${cacheStats["totalRenderCount"]}
+            总缓存命中次数: ${cacheStats["totalCacheHitCount"]}
+            全局命中率: ${String.format("%.1f", cacheStats["globalHitRate"])}%
+            平均解析时间: ${cacheStats["averageParseTime"]}ms
+            当前内存使用: ${cacheStats["lastMemoryUsage"]}MB
+            Entry缓存类型数: ${cacheStats["entryCacheCount"]}
+        """.trimIndent()
+        
+        // 显示在对话框中
+        android.app.AlertDialog.Builder(this)
+            .setTitle("缓存性能报告")
+            .setMessage(fullReport)
+            .setPositiveButton("确定", null)
+            .setNeutralButton("清除缓存") { _, _ ->
+                MarkwonMultiTypeAdapter.clearAllCaches()
+                CachePerformanceAnalyzer.clearAll()
+                Toast.makeText(this, "缓存已清除", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+        
+        // 同时输出到日志
+        AppLog.d("MainActivity: 缓存性能报告\n$fullReport")
+    }
+    
+    /**
      * 暂停图片加载以提高滚动性能
      */
     private fun pauseImageLoading() {
@@ -420,30 +506,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    override fun onLowMemory() {
-        super.onLowMemory()
-        // 智能缓存清理
-        com.github.turbomarkwon.cache.CachePerformanceAnalyzer.performSmartCacheCleanup()
-        // 清理语法高亮缓存以释放内存
-        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
-        // 清理 Mermaid 渲染缓存
-        MermaidRenderCache.smartCleanup()
-    }
-    
     override fun onDestroy() {
         super.onDestroy()
-        // 清理资源
-        com.github.turbomarkwon.renderer.MarkdownRenderer.clearCache()
-        com.github.turbomarkwon.cache.LightweightMarkdownCache.clearAll()
-        com.github.turbomarkwon.cache.CachePerformanceAnalyzer.logPerformanceDetails()
         
-        // 清理语法高亮缓存
-        com.github.turbomarkwon.views.CodeDisplayView.clearSyntaxCache()
+        // 清除适配器缓存以避免内存泄漏
+        MarkwonMultiTypeAdapter.clearAllCaches()
+        AppLog.d("MainActivity: 已清除适配器缓存")
         
-        // 清理Mermaid 渲染缓存
-        MermaidRenderCache.clearAll()
+        // 清除其他缓存
+        CachePerformanceAnalyzer.clearAll()
         
-        // 停止RecyclerView性能监控
         recyclerViewPerformanceMonitor?.stopMonitoring(binding.recyclerView)
+    }
+    
+    override fun onLowMemory() {
+        super.onLowMemory()
+        
+        // 低内存时清除缓存
+        AppLog.d("MainActivity: 检测到低内存，清除缓存")
+        MarkwonMultiTypeAdapter.clearAllCaches()
+        CachePerformanceAnalyzer.handleLowMemory()
+    }
+    
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        
+        when (level) {
+            TRIM_MEMORY_MODERATE,
+            TRIM_MEMORY_COMPLETE -> {
+                // 内存紧张时清除缓存
+                AppLog.d("MainActivity: 内存紧张(level=$level)，清除适配器缓存")
+                MarkwonMultiTypeAdapter.clearAllCaches()
+            }
+            TRIM_MEMORY_BACKGROUND,
+            TRIM_MEMORY_UI_HIDDEN -> {
+                // 应用进入后台时部分清理
+                AppLog.d("MainActivity: 应用后台(level=$level)，执行部分缓存清理")
+                CachePerformanceAnalyzer.trimCaches()
+            }
+        }
     }
 }

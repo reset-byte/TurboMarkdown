@@ -162,7 +162,6 @@ class CodeDisplayView @JvmOverloads constructor(
         // 代码容器（行号 + 代码内容）
         codeContainer = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            setBackgroundColor(ContextCompat.getColor(context, R.color.black_0))
             setPadding(0, 24, 0, 24)
         }
 
