@@ -16,14 +16,9 @@ import com.github.turbomarkwon.util.RecyclerViewPerformanceMonitor
 import com.google.android.material.snackbar.Snackbar
 import io.noties.markwon.Markwon
 import androidx.recyclerview.widget.RecyclerView
-import com.github.turbomarkwon.cache.MermaidRenderCache
 import io.noties.markwon.recycler.MarkwonAdapter
 import com.github.turbomarkwon.adapter.MarkwonMultiTypeAdapter
 import com.github.turbomarkwon.cache.CachePerformanceAnalyzer
-import android.content.ComponentCallbacks2.TRIM_MEMORY_MODERATE
-import android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
-import android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND
-import android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN
 import android.widget.Toast
 
 /**

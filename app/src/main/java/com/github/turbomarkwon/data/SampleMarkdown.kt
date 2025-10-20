@@ -678,10 +678,6 @@ TurboMarkdown 通过创新的分块渲染技术，成功解决了 Android 平台
 - [RecyclerView 最佳实践](https://developer.android.com/guide/topics/ui/layout/recyclerview)
 
 ---
-
-*文档版本：1.0*  
-*最后更新：2024年*  
-*作者：TurboMarkdown 开发团队*
     """.trimIndent()
     
     /**

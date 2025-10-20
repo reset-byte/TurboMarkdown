@@ -1018,7 +1018,7 @@ object MarkwonMultiTypeAdapter {
             markwon.setParsedMarkdown(textView, rendered)
             
             // 添加引用样式
-            textView.setPadding(32, 16, 0, 16)
+            textView.setPadding(16, 16, 0, 16)
             textView.setBackgroundColor(0x1A000000) // 半透明背景
             
             holder.contentLayout.addView(textView)
