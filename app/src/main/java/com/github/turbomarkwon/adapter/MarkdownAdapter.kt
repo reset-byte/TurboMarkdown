@@ -689,8 +689,8 @@ class MarkdownAdapter(
                 MarkdownRenderer.renderNode(item.node, binding.textView, markwon)
 
                 // 添加引用样式
-                binding.textView.setPadding(32, 16, 0, 16)
-                binding.textView.setBackgroundColor(0x0D000000) // 轻微背景色
+                binding.textView.setPadding(16, 16, 0, 16)
+                binding.textView.setBackgroundColor(0x0A000000) // 轻微背景色
             }
         }
     }
